@@ -1,0 +1,17 @@
+The code is for personal use only - not for profit
+
+This code is still a work in progress, and I expect to update it from time to time.
+
+Use the latest Reference file from here
+https://ybrowse.org/gbrowse2/gff/snps_hg38.vcf.gz
+This file is updated every day with new variants
+
+You also need the Reference file "Msnps_hg19.vcf.gz" that I made from the file https://ybrowse.org/gbrowse2/gff/snps_hg19.csv (because there is a problem of mixing genomic locations between the two references in the file https://ybrowse.org/gbrowse2/gff/snps_hg38.vcf.gz)
+
+Both files should be in the folder where the code is saved.
+
+This code analyzes which branch of the Y chromosome tree the sample is on.
+It extracts Y chromosome data from raw files from FTDNA, MyHeritage, Ancestry, 23&Me, and from whole genome VCF files.
+
+Some files contain only a small amount of Y chromosome information, so the result is a high branch that is not up-to-date.
+Usually, VCF files will yield a up-to-date branch
