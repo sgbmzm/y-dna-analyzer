@@ -1,5 +1,7 @@
 The code is for personal use only - not for profit
 
+MAIN-CODE_FILE = Ytree_SNP_Analyzer_yclade.py
+
 This code is still a work in progress, and I expect to update it from time to time.
 
 It is recommended to run the code through the software https://thonny.org/
