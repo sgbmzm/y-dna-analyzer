@@ -15,3 +15,6 @@ It extracts Y chromosome data from raw files from FTDNA, MyHeritage, Ancestry, 2
 
 Some files contain only a small amount of Y chromosome information, so the result is a high branch that is not up-to-date.
 Usually, VCF files will yield a up-to-date branch
+
+This code was born only because of https://pypi.org/project/yclade/
+Thank them for that.
