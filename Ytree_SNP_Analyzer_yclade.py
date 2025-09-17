@@ -13,6 +13,7 @@ import webbrowser
 last_clades = []
 last_positive_snps_list = []
 last_positive_snp_string = ""
+last_ref_type = ""
 reference_snps = {}      # pos -> ref_snp_name + ref_allele
 reference_names = {}      # id_snp_name -> pos
 user_snaps = {}          # pos -> ref_snp_name + ref_allele
@@ -26,8 +27,7 @@ user_loaded = False
 # ------------------------
 def set_buttons_state(state):
     btn_calculate_clade.config(state=state)
-    btn_check_user.config(state=state)
-    btn_check_ref.config(state=state)
+    btn_check.config(state=state)
     btn_paste.config(state=state)
     #if last_clades:
     btn_save_results.config(state=state)
@@ -237,9 +237,14 @@ def load_dna_file():
                     continue  # דילוג על שורות לא תקינות
                 
                 if is_vcf_file:
+                    # לקובץ ויסיאף יש סדר מסויים ומוקפד לעמודות
                     chrom, pos_str, rsid, ref, alt, qual = parts[:6]
                     sample_index = 0 # לפעמים יש כמה נבדקים שונים וכל אחד מהם בטור אחד אחרי השני כאן מדובר באחד בלבד
-                    gt_str = parts[9 + sample_index].split(":")[0] # לוקח רק את החלק של ה־GT (למשל "0/1" או "1/1" מתוך העמודה של הנבדק הראשון
+                    sample_info = parts[9 + sample_index].split(":") # זה מכיל את כל המידע על נתוני הנבדק הנוכחי וכדלהלן
+                    gt_str = sample_info[0] # לוקח רק את החלק של ה־GT (למשל "0/1" או "1/1"
+                    ad_str = sample_info[1] # לוקח כמה קריאות לכל ווריאנט לדוגמא: 17,0 אומר 17 קריאות כמו הרפרנס ואפס קריאות כמו ה-אלט 
+                    dp_str = sample_info[2] # כמה קריאות היו בסך הכל
+                    
                     alleles = [int(a) for a in re.split("[/|]", gt_str) if a.isdigit()]
                     if any(a > 0 for a in alleles): # כלומר אם יש שם משהו שהוא 1 אז יש משהו חיובי וזה אומר שהוא כמו ה alt
                         is_positive = True
@@ -247,10 +252,10 @@ def load_dna_file():
                     else:
                         is_positive = False
                         alleles_str = ref
-                else:
-                    # נניח שהשדות הראשונים תמיד הם: rsid, chrom, pos, alleles
+                else: # זה לא ויסיאף אלא קובץ שרובו אוטוזומלי מהחברות הקטנות כמו מייהירטייג אנססטרי וכו ומכיל מעט מידע על כרומזום Y
+                    # השדות הראשונים תמיד הם: rsid, chrom, pos, alleles
                     rsid, chrom, pos_str, alleles_str = parts[:4]
-                    ref = "?"
+                    ad_str = ""
                 
                 # עושה אלל אחד גדול גם היה קטן וגם אם היו שניים יחד
                 allele_str = alleles_str.upper().strip()[0] if alleles_str else ""
@@ -261,7 +266,7 @@ def load_dna_file():
                     continue
                 
                 # הוספת השורה למילון המשתמש לאחר שוודאנו שמובר בשורה של Y
-                user_snps[int(pos_str)] = {"chrom": chrom, "pos_str": pos_str, "snp_name": "?", "ref": "?", "alt": allele_str, "is_positive": "?"}
+                user_snps[int(pos_str)] = {"chrom": chrom, "pos_str": pos_str, "snp_name": "?", "allele": allele_str, "is_positive": "?", "ad-R/A": ad_str}
                 
                 # בדיקה מול הרפרנס
                 if not pos_str.isdigit():
@@ -406,39 +411,21 @@ def save_clades_to_file():
         messagebox.showerror("Error", f"Failed to save file: {e}")
 
 # ------------------------
-# בדיקת מיקום גנומי מהירה (עם שימוש במיפוי העמודות)
+# בדיקת שם סניפ או מיקום גנומי בנתוני המשתמש וברפרנס
 # ------------------------
-def check_position():
-    if not user_loaded:
-        return
-    
-    pos_input = entry_search.get().strip()
-    
-    if pos_input.isdigit():
-        pos = int(pos_input)
-        fields = user_snps.get(pos)
-        
-    if fields:
-        user_result_var.set(fields)
-        
-    else:
-        user_result_var.set(f"Position {pos} not found in user DNA_file")
-        user_result_label.config(fg="blue", bg="red")
-        
-        
+       
 def check_search_input(ref_search = True):
     if not reference_loaded:
         return
     
     global reference_names, reference_snaps, user_snps
     
-    search_input = entry_search.get().strip().upper()
+    search_input = entry_search.get().strip().upper()[:10] # מסירים רווחים הופכים לאותיות גדולות וחותכים את כל מה שמעבר ל 10 אותיות או ספרות
     
     if search_input.isdigit():
         pos = int(search_input)
         fields_reference = reference_snps.get(pos)
-        fields_user = user_snps.get(pos)
-    
+        fields_user = user_snps.get(pos)    
     else:  
         pos = reference_names.get(search_input)
         fields_user = user_snps.get(pos)
@@ -462,7 +449,7 @@ def check_search_input(ref_search = True):
 # הדבקה מהלוח
 # ------------------------
 def paste_from_clipboard():
-    clipboard_text = root.clipboard_get().strip()
+    clipboard_text = root.clipboard_get().strip()[:15]
     entry_search.delete(0, tk.END)
     entry_search.insert(0, clipboard_text)
 
@@ -507,31 +494,35 @@ link_label_ftdna.grid(row=8, column=0, columnspan=3, padx=5, pady=5)
 btn_save_results = tk.Button(root, text="Save Clades to TXT", command=save_clades_to_file, state="disabled")
 btn_save_results.grid(row=9, column=0, columnspan=3, pady=5)
 
-
-# בדיקת מיקום גנומי (עם תווית שמציינת hg38/hg19)
-#tk.Label(root, text="Genomic position (numeric):").grid(row=10, column=0, sticky="e")
-entry_search = tk.Entry(root, width=20)
-entry_search.grid(row=10, column=1, padx=5, pady=5)
+# בדיקת מיקום גנומי עם הכיתוב hg38
+tk.Label(root, text="_____________________________").grid(row=10, column=1, sticky="e")
 
 # כפתור הדבקה משמאל עם בדיקה
 btn_paste = tk.Button(root, text="Paste", command=paste_from_clipboard, state="disabled")
-btn_paste.grid(row=10, column=2, padx=5, pady=5)
+btn_paste.grid(row=12, column=2, padx=5, pady=5)
+
+# בדיקת מיקום גנומי עם הכיתוב hg38
+tk.Label(root, text="Reference:").grid(row=13, column=0, sticky="e")
+
+# בדיקת מיקום גנומי עם הכיתוב hg38
+tk.Label(root, text="User:").grid(row=13, column=3, sticky="e")
+
+# בדיקת מיקום גנומי (עם תווית שמציינת hg38/hg19)
+entry_search = tk.Entry(root, width=15)
+entry_search.grid(row=13, column=1, padx=5, pady=5)
 
 # כפתור בדיקה בנתוני המשתמש
-btn_check_user = tk.Button(root, text="Check Y-SNP in user DNA_file", command=check_search_input, state="disabled")
-btn_check_user.grid(row=10, column=3, padx=5, pady=5)
+btn_check = tk.Button(root, text="Check Y-SNP", command=check_search_input, state="disabled")
+btn_check.grid(row=14, column=1, padx=5, pady=5)
+    
+ref_result_var = tk.StringVar()
+ref_result_label = tk.Label(root, textvariable=ref_result_var, justify="left", fg="green")
+ref_result_label.grid(row=14, column=0, padx=5, pady=10)
 
 user_result_var = tk.StringVar()
 user_result_label = tk.Label(root, textvariable=user_result_var, justify="left", fg="green")
-user_result_label.grid(row=11, column=3, columnspan=2, padx=5, pady=10)
-    
-# כפתור בדיקה בנתוני הרפרנס
-btn_check_ref = tk.Button(root, text="Check Y-SNP in reference file", command=check_search_input, state="disabled")
-btn_check_ref.grid(row=10, column=0, padx=5, pady=5)
+user_result_label.grid(row=14, column=2, padx=5, pady=10)
 
-ref_result_var = tk.StringVar()
-ref_result_label = tk.Label(root, textvariable=ref_result_var, justify="left", fg="green")
-ref_result_label.grid(row=11, column=0, columnspan=2, padx=5, pady=10)
 
 root.mainloop()
 
