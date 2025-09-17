@@ -18,3 +18,5 @@ Usually, VCF files will yield a up-to-date branch
 
 This code was born only because of https://pypi.org/project/yclade/
 Thank them for that.
+
+This code was created in collaboration with GPT-Chat. It stopped a lot for me.
