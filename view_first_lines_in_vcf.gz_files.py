@@ -21,7 +21,7 @@ def open_vcf():
     except Exception as e:
         text_area.insert(tk.END, f"Error reading file: {e}")
 
-def open_vcf_y_rows_onlyֹ():
+def open_vcf_y_rows_only():
     file_path = filedialog.askopenfilename(
         title="Select VCF.GZ file",
         filetypes=[("VCF GZ files", "*.vcf.gz")]
@@ -52,15 +52,14 @@ def open_vcf_y_rows_onlyֹ():
 root = tk.Tk()
 root.title("VCF.GZ Viewer (First 200 lines)")
 
-btn = tk.Button(root, text="Open VCF.GZ File", command=open_vcf)
-btn.pack(pady=10)
+btn1 = tk.Button(root, text="Open VCF.GZ File", command=open_vcf)
+btn1.pack(pady=10)
 
-btn = tk.Button(root, text="Open VCF.GZ File Y-ROWS_ONLY", command=open_vcf_y_rows_only)
-btn.pack(pady=10)
+btn2 = tk.Button(root, text="Open VCF.GZ File Y-ROWS_ONLY", command=open_vcf_y_rows_only)
+btn2.pack(pady=10)
 
 
 text_area = scrolledtext.ScrolledText(root, width=120, height=30)
 text_area.pack(padx=10, pady=10)
 
 root.mainloop()
-
