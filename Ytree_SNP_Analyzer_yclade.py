@@ -11,58 +11,33 @@ import webbrowser
 # משתנים גלובליים
 # ------------------------
 last_clades = []
-last_positive_snps_list = []
 last_positive_snp_string = ""
 last_ref_type = ""
 reference_snps = {}      # pos -> ref_snp_name + ref_allele
 reference_names = {}      # id_snp_name -> pos
 user_snaps = {}          # pos -> ref_snp_name + ref_allele
-current_dna_file = ""
-current_reference_file = ""
+last_dna_file = ""
+last_reference_file = ""
 reference_loaded = False
 user_loaded = False
 
 # ------------------------
-# GUI כפתורים
+# איפוס משתמש
 # ------------------------
-def set_buttons_state(state):
-    btn_calculate_clade.config(state=state)
-    btn_check.config(state=state)
-    btn_paste.config(state=state)
-    #if last_clades:
-    btn_save_results.config(state=state)
-
-def update_buttons_state():
-    if reference_loaded and user_loaded:
-        set_buttons_state("normal")
-    else:
-        set_buttons_state("disabled")
-
-# ------------------------
-# איפוס
-# ------------------------
-def reset_all():
-    global last_clades, last_positive_snp_string, last_positive_snps_list
-    global reference_snps, reference_names, current_dna_file, reference_loaded, user_loaded
+def reset_user():
+    global last_clades, last_positive_snp_string, last_dna_file, user_loaded 
     
     last_clades = []
-    last_positive_snps_list = []
     last_positive_snp_string = ""
-    reference_snps = {}
-    reference_names={}
-    current_dna_file = ""
-    current_reference_file = ""
-    reference_loaded = False
+    last_dna_file = ""
     user_loaded = False
-    #ref_var.set(value="Aautodetect")
 
     result_var.set("")
     link_label_yfull.config(text="", fg="blue", cursor="")
     link_label_ftdna.config(text="", fg="blue", cursor="")
     dna_loading_label.config(text="No DNA_file loaded", fg="red")
-    reference_loading_label.config(text="No reference_file loaded", fg="red")
     info_label.config(text="")
-    update_buttons_state()
+    btn_save_results.grid_forget()
     
     
 
@@ -90,7 +65,7 @@ def detect_reference(file_path):
 # טעינת רפרנס
 # ------------------------
 def load_reference(ref_path="ask"):
-    global reference_loaded, reference_snps, reference_names, current_reference_file
+    global reference_loaded, reference_snps, reference_names, last_reference_file
     
     if ref_path == "ask":
         
@@ -142,8 +117,8 @@ def load_reference(ref_path="ask"):
                         
         reference_loaded = True
         reference_loading_label.config(fg="blue", text=f"Reference loaded: {os.path.basename(ref_path)}     {len(reference_snps)} Y-SNPs")
-        current_reference_file = os.path.basename(ref_path)
-        update_buttons_state()
+        last_reference_file = os.path.basename(ref_path)
+        #update_buttons_state()
         
     except Exception as e:
         messagebox.showerror("Error", f"Failed to load reference: {e}")
@@ -158,8 +133,8 @@ def load_reference(ref_path="ask"):
         
 def load_dna_file():
     
-    # כל פעם כשבוחרים קובץ נא חדש הכל מתאפס ומחושב מהתחלה
-    reset_all()
+    # כל פעם כשבוחרים קובץ דנא חדש הכל מתאפס ומחושב מהתחלה
+    reset_user()
     
     # בחירת קובץ הנא של המשתמש
     file_path = filedialog.askopenfilename(
@@ -185,21 +160,26 @@ def load_dna_file():
     else:
         ref_path = "ask"
     
-    # טעינת הרפרנס הנבחר    
-    load_reference(ref_path)
+    global last_reference_file, reference_loaded
+        
+    if not last_reference_file == ref_path:
+        reference_loaded = False
+    
+    if not reference_loaded:    
+        # טעינת הרפרנס הנבחר    
+        load_reference(ref_path)
     
     # הצהרה על משתנים גלובליים הדרושים להלן
-    global last_clades, last_positive_snp_string, last_positive_snps_list, current_dna_file, user_snps, user_loaded, reference_loaded
+    global last_clades, last_positive_snp_string, last_dna_file, user_snps, user_loaded
     
     # אם לא בחרו קובץ רפרנס מאפסים הכל ולא ממשיכים
     if not reference_loaded:
-        reset_all()
+        reset_user()
         return
 
     last_clades = []
-    last_positive_snps_list = []
     last_positive_snp_string = ""
-    current_dna_file = file_path
+    last_dna_file = file_path
 
     dna_loading_label.config(text=f"Loading {os.path.basename(file_path)} ...")
     root.update()
@@ -278,7 +258,6 @@ def load_dna_file():
                 if allele_str == ref_info["alt"]:
                     s = f"{ref_info['name']}+"
                     positive_snps.append(s)
-                    last_positive_snps_list.append(s)
                     user_snps[int(pos_str)]["is_positive"] = "Yes"   # או "כן" / "+" או כל מה שאתה רוצה
                     user_snps[int(pos_str)]["snp_name"] = ref_info['name']
                 elif allele_str == ref_info["ref"] or allele_str == ".":
@@ -286,15 +265,16 @@ def load_dna_file():
                     user_snps[int(pos_str)]["snp_name"] = ref_info['name']
 
         last_positive_snp_string = ", ".join(positive_snps)
-        #print("Final positive SNPs:", last_positive_snps_list)
+        #print("Final positive SNPs:", last_positive_snp_string)
 
         dna_loading_label.config(fg="blue", text=f"DNA file loaded: {os.path.basename(file_path)}     {len(user_snps)} total Y-rows,     {len(positive_snps)} Positive Y-SNPs,     in DNA_file")
         user_loaded = True
-        update_buttons_state()
+        
+        run_calculate_clade()
 
     except Exception as e:
         messagebox.showerror("Error", f"Failed reading file: {e}")
-        loading_label.config(text="")
+        dna_loading_label.config(text="")
 
                   
 def run_calculate_clade():
@@ -302,7 +282,7 @@ def run_calculate_clade():
 
     if not last_positive_snp_string:
         result_var.set("No matching SNPs were found in the file")
-        loading_label.config(text="Analysis finished - no matching SNPs found.")
+        info_label.config(text="Analysis finished - no matching SNPs found.")
         return
 
     try:
@@ -321,7 +301,7 @@ def run_calculate_clade():
 
         if not clades:
             result_var.set("No clades returned by yclade.")
-            loading_label.config(text="Analysis finished - no clades returned.")
+            info_label.config(text="Analysis finished - no clades returned.")
             return
 
         Final_clade = clades[0]
@@ -362,7 +342,8 @@ def run_calculate_clade():
                 
         info_label.config(text="Analysis finished successfully.")
         
-        btn_save_results.config(state="normal")
+        # מניחים את הלחצן רק אחרי שיש תוצאות
+        btn_save_results.grid(row=9, column=0, columnspan=3, pady=5)
 
     except Exception as e:
         messagebox.showerror("Error", str(e))
@@ -379,7 +360,7 @@ def save_clades_to_file():
         messagebox.showerror("Error", "No Clades to save.")
         return
     file_path = filedialog.asksaveasfilename(
-        initialfile=f"{os.path.basename(current_dna_file)}.yclade_results.txt",
+        initialfile=f"{os.path.basename(last_dna_file)}.yclade_results.txt",
         defaultextension=".txt",
         filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
     )
@@ -387,8 +368,8 @@ def save_clades_to_file():
         return
     try:
         with open(file_path, "w", encoding="utf-8") as f:
-            f.write(f"Source DNA_file: {os.path.basename(current_dna_file)}\n")
-            f.write(f"Reference SNPs loaded: {os.path.basename(current_reference_file)}\n\n")
+            f.write(f"Source DNA_file: {os.path.basename(last_dna_file)}\n")
+            f.write(f"Reference SNPs loaded: {os.path.basename(last_reference_file)}\n\n")
             f.write(f"SNPs used for YClade analysis:\n{last_positive_snp_string}\n\n")
             f.write(f"The above SNPs can used in https://predict.yseq.net/clade-finder/index.php\n")
             
@@ -415,21 +396,27 @@ def save_clades_to_file():
 # ------------------------
        
 def check_search_input(ref_search = True):
+    
+    global reference_names, reference_snaps, user_snps, user_loaded, reference_loaded
+    
+    if not reference_loaded:
+        choice = messagebox.askyesnocancel("Reference not Autodetected", "Autodetected Reference faild\nChoose hg19, hg38, or select file manually.\n\nYes = hg19, No = hg38, Cancel = choose manually")
+        ref_path = "Msnps_hg19.vcf.gz" if choice else "snps_hg38.vcf.gz" if (choice == False) else "ask"       
+        load_reference(ref_path)
+        
     if not reference_loaded:
         return
-    
-    global reference_names, reference_snaps, user_snps
     
     search_input = entry_search.get().strip().upper()[:10] # מסירים רווחים הופכים לאותיות גדולות וחותכים את כל מה שמעבר ל 10 אותיות או ספרות
     
     if search_input.isdigit():
         pos = int(search_input)
         fields_reference = reference_snps.get(pos)
-        fields_user = user_snps.get(pos)    
+        fields_user = user_snps.get(pos) if user_loaded else False
     else:  
         pos = reference_names.get(search_input)
-        fields_user = user_snps.get(pos)
         fields_reference = reference_snps.get(pos)
+        fields_user = user_snps.get(pos) if user_loaded else False
             
     if fields_reference:
         ref_result_var.set(fields_reference)
@@ -475,10 +462,7 @@ dna_loading_label = tk.Label(root, text="No DNA_file loaded", fg="red")
 dna_loading_label.grid(row=3, column=0, columnspan=3, padx=5, pady=5)
 
 info_label = tk.Label(root, text="", anchor="w", justify="left")
-info_label.grid(row=4, column=0, columnspan=3, sticky="we", padx=5, pady=5)
-
-btn_calculate_clade = tk.Button(root, text="Calculate Clade", command=run_calculate_clade, state="disabled")
-btn_calculate_clade.grid(row=5, column=0, columnspan=3, pady=5)
+info_label.grid(row=4, column=0, columnspan=3, padx=5, pady=5)
 
 result_var = tk.StringVar()
 result_label = tk.Label(root, textvariable=result_var, justify="left", fg="green")
@@ -491,28 +475,28 @@ link_label_ftdna = tk.Label(root, text="", fg="blue", cursor="")
 link_label_ftdna.grid(row=8, column=0, columnspan=3, padx=5, pady=5)
 
 
-btn_save_results = tk.Button(root, text="Save Clades to TXT", command=save_clades_to_file, state="disabled")
-btn_save_results.grid(row=9, column=0, columnspan=3, pady=5)
+btn_save_results = tk.Button(root, text="Save Clades to TXT", command=save_clades_to_file)
+# המיקום גריד שלו מתבצע בפונקציית כלכולייט קלייד
 
 # בדיקת מיקום גנומי עם הכיתוב hg38
 tk.Label(root, text="_____________________________").grid(row=10, column=1, sticky="e")
 
 # כפתור הדבקה משמאל עם בדיקה
-btn_paste = tk.Button(root, text="Paste", command=paste_from_clipboard, state="disabled")
+btn_paste = tk.Button(root, text="Paste", command=paste_from_clipboard)
 btn_paste.grid(row=12, column=2, padx=5, pady=5)
 
 # בדיקת מיקום גנומי עם הכיתוב hg38
-tk.Label(root, text="Reference:").grid(row=13, column=0, sticky="e")
+tk.Label(root, text="Reference:").grid(row=13, column=0, sticky="we")
 
 # בדיקת מיקום גנומי עם הכיתוב hg38
-tk.Label(root, text="User:").grid(row=13, column=3, sticky="e")
+tk.Label(root, text="User:").grid(row=13, column=3, sticky="we")
 
 # בדיקת מיקום גנומי (עם תווית שמציינת hg38/hg19)
 entry_search = tk.Entry(root, width=15)
 entry_search.grid(row=13, column=1, padx=5, pady=5)
 
 # כפתור בדיקה בנתוני המשתמש
-btn_check = tk.Button(root, text="Check Y-SNP", command=check_search_input, state="disabled")
+btn_check = tk.Button(root, text="Check Y-SNP", command=check_search_input) 
 btn_check.grid(row=14, column=1, padx=5, pady=5)
     
 ref_result_var = tk.StringVar()
@@ -523,6 +507,6 @@ user_result_var = tk.StringVar()
 user_result_label = tk.Label(root, textvariable=user_result_var, justify="left", fg="green")
 user_result_label.grid(row=14, column=2, padx=5, pady=10)
 
-
 root.mainloop()
+
 
