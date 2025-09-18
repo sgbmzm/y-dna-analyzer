@@ -1,0 +1,1 @@
+pyinstaller --noconsole --onefile --add-data "Ytree_SNP_Analyzer_yclade.py;." --add-data "Msnps_hg19.vcf.gz;." --add-data "snps_hg38.vcf.gz;." Ytree_SNP_Analyzer_yclade.py
