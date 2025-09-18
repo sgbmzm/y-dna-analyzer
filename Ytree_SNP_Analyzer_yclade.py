@@ -47,22 +47,31 @@ def reset_user():
     
     
 # פונקצייה לבדיקה האם כתוב בקובץ באיזה רפרנס הוא משתמש
-def detect_reference(file_path):
+def detect_reference(file_path, what_detect="type"):
     
     ref_map = {
         "hg19": ["build 37", "grch37", "hg19"],
-        "hg38": ["build 38", "grch38", "hg38"],
+        "hg38": ["build 38", "grch38", "hg38", "hg 38"],
     }
     
     opener = gzip.open if file_path.endswith(".gz") else open
     with opener(file_path, "rt", encoding="utf-8") as f:
+        
         for line in f:
             if not line.startswith("#"):
                 break  # יציאה – כבר עברנו את ה-header
+            
             lower_line = line.lower()
-            for ref, keys in ref_map.items():
-                if any(k in lower_line for k in keys):
-                    return ref
+            
+            if what_detect == "date":
+                if "date=" in lower_line:
+                    date = line.strip().split("date=")[:15]
+                    date = lower_line.split("date=", 1)[1].strip()
+                    return date
+            else:
+                for ref, keys in ref_map.items():
+                    if any(k in lower_line for k in keys):
+                        return ref
     return None  # לא זוהה
 
 
@@ -123,7 +132,7 @@ def load_reference(ref_path="ask"):
                         reference_names[snp_name] = pos
                         
         reference_loaded = True
-        reference_loading_label.config(fg="blue", text=f"Reference loaded: \nname: {os.path.basename(ref_path)}  \n Y-SNPs: {len(reference_snps)}  \ntype: {last_ref_type}")
+        reference_loading_label.config(fg="blue", text=f"Reference loaded: \nname: {os.path.basename(ref_path)}  \n Y-SNPs: {len(reference_snps)}  \ntype: {last_ref_type} \ndate: {detect_reference(ref_path, what_detect='date')}")
         last_reference_file = os.path.basename(ref_path)
         btn_unload_ref.grid(row=1, column=0, padx=5, pady=5)
         #update_buttons_state()
@@ -573,5 +582,6 @@ tk.Label(root, text="NOTE: Each reference has different positions").grid(row=15,
 
 
 root.mainloop()
+
 
 
