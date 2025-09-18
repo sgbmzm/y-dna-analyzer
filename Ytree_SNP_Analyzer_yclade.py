@@ -94,6 +94,9 @@ def detect_reference(file_path, what_detect="type"):
 def load_reference(ref_path="ask"):
     global reference_loaded, reference_snps, reference_names, last_reference_file, last_ref_type
     
+    if ref_path != "ask":
+        ref_path = resource_path(ref_path)
+    
     if ref_path == "ask":
         
         messagebox.showwarning("select Reference file", f"Now Need to select Reference file. file can be downloaded from: https://ybrowse.org/gbrowse2/gff/")
@@ -146,7 +149,7 @@ def load_reference(ref_path="ask"):
                         
         reference_loaded = True
         reference_loading_label.config(fg="blue", text=f"Reference loaded: \nname: {os.path.basename(ref_path)}  \n Y-SNPs: {len(reference_snps)}  \ntype: {last_ref_type} \ndate: {detect_reference(ref_path, what_detect='date')}")
-        last_reference_file = os.path.basename(ref_path)
+        last_reference_file = resource_path(ref_path)
         btn_unload_ref.grid(row=1, column=0, padx=5, pady=5)
         #update_buttons_state()
         
@@ -185,13 +188,16 @@ def load_dna_file():
             ref_path = "Msnps_hg19.vcf.gz" if choice else "snps_hg38.vcf.gz" if (choice == False) else "ask"
         
         # במקרה שקובץ הרפרנס לא נמצא בתיקיית הסקריפט הנוכחי יש לבחור קובץ באופן ידני
-        if ref_path != "ask" and not os.path.exists(ref_path):
+        if ref_path != "ask" and not resource_path(ref_path):
             messagebox.showwarning("Reference file missing", f"Reference file:     {ref_path}     missing \nplease select file manually")
             ref_path = "ask"       
     else:
         ref_path = "ask"
     
     global last_reference_file, reference_loaded
+    
+    if ref_path != "ask":
+        ref_path = resource_path(ref_path)
         
     if not last_reference_file == ref_path:
         reference_loaded = False
@@ -595,6 +601,4 @@ tk.Label(root, text="NOTE: Each reference has different positions").grid(row=15,
 
 
 root.mainloop()
-
-
 
