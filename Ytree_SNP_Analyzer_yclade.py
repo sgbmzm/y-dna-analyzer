@@ -20,6 +20,7 @@ last_dna_file = ""
 last_reference_file = ""
 reference_loaded = False
 user_loaded = False
+last_dna_file_type = ""
 
 # ------------------------
 # איפוס משתמש
@@ -37,10 +38,13 @@ def reset_user():
     link_label_ftdna.config(text="", fg="blue", cursor="")
     dna_loading_label.config(text="No DNA_file loaded", fg="red")
     info_label.config(text="")
+    user_result_var.set("")
+    user_result_label.config(text="", bg="SystemButtonFace")
     btn_save_results.grid_forget()
+    btn_unload_ref.grid_forget()
+    last_dna_file_type = ""
     
     
-
 # פונקצייה לבדיקה האם כתוב בקובץ באיזה רפרנס הוא משתמש
 def detect_reference(file_path):
     
@@ -65,7 +69,7 @@ def detect_reference(file_path):
 # טעינת רפרנס
 # ------------------------
 def load_reference(ref_path="ask"):
-    global reference_loaded, reference_snps, reference_names, last_reference_file
+    global reference_loaded, reference_snps, reference_names, last_reference_file, last_ref_type
     
     if ref_path == "ask":
         
@@ -81,6 +85,8 @@ def load_reference(ref_path="ask"):
     
     reference_loading_label.config(text=f"Loading reference {os.path.basename(ref_path)} ...")
     root.update()
+    
+    last_ref_type = detect_reference(ref_path) 
 
     reference_snps = {}
     reference_names = {}
@@ -116,8 +122,9 @@ def load_reference(ref_path="ask"):
                         reference_names[snp_name] = pos
                         
         reference_loaded = True
-        reference_loading_label.config(fg="blue", text=f"Reference loaded: {os.path.basename(ref_path)}     {len(reference_snps)} Y-SNPs")
+        reference_loading_label.config(fg="blue", text=f"Reference loaded: {os.path.basename(ref_path)}  |  {len(reference_snps)} Y-SNPs  |  type: {last_ref_type}")
         last_reference_file = os.path.basename(ref_path)
+        btn_unload_ref.grid(row=2, column=0, padx=5, pady=5)
         #update_buttons_state()
         
     except Exception as e:
@@ -170,7 +177,7 @@ def load_dna_file():
         load_reference(ref_path)
     
     # הצהרה על משתנים גלובליים הדרושים להלן
-    global last_clades, last_positive_snp_string, last_dna_file, user_snps, user_loaded
+    global last_clades, last_positive_snp_string, last_dna_file, user_snps, user_loaded, last_dna_file_type
     
     # אם לא בחרו קובץ רפרנס מאפסים הכל ולא ממשיכים
     if not reference_loaded:
@@ -180,6 +187,7 @@ def load_dna_file():
     last_clades = []
     last_positive_snp_string = ""
     last_dna_file = file_path
+    last_dna_file_type = ref_auto_detect
 
     dna_loading_label.config(text=f"Loading {os.path.basename(file_path)} ...")
     root.update()
@@ -260,8 +268,9 @@ def load_dna_file():
                 if chrom not in ("Y", "24"):
                     continue
                 
+                
                 # הוספת השורה למילון המשתמש לאחר שוודאנו שמובר בשורה של Y
-                user_snps[int(pos_str)] = {"chrom": chrom, "pos_str": pos_str, "snp_name": "?", "allele": allele_str, "is_positive": "?", "ad-R/A": ad_str}
+                user_snps[int(pos_str)] = {"chrom": chrom, "pos_str": pos_str, "ref": ref_auto_detect, "snp_name": "?", "allele": allele_str, "is_positive": "?", "ad-R/A": ad_str}
                 
                 # בדיקה מול הרפרנס
                 if not pos_str.isdigit():
@@ -282,7 +291,7 @@ def load_dna_file():
         last_positive_snp_string = ", ".join(positive_snps)
         #print("Final positive SNPs:", last_positive_snp_string)
 
-        dna_loading_label.config(fg="blue", text=f"DNA file loaded: {os.path.basename(file_path)}     {len(user_snps)} total Y-rows,     {len(positive_snps)} Positive Y-SNPs,     in DNA_file")
+        dna_loading_label.config(fg="blue", text=f"DNA file loaded: {os.path.basename(file_path)} {len(user_snps)} total Y-rows  |  {len(positive_snps)} Positive Y-SNPs in DNA_file  |  type: {last_dna_file_type}")
         user_loaded = True
         
         run_calculate_clade()
@@ -293,7 +302,7 @@ def load_dna_file():
 
                   
 def run_calculate_clade():
-    global last_clades
+    global last_clades, last_reference_file, ref_user_file, last_dna_file_type, last_ref_type
 
     if not last_positive_snp_string:
         result_var.set("No matching SNPs were found in the file")
@@ -327,7 +336,7 @@ def run_calculate_clade():
         # לוקחים את כל הקלאדים עם ה-score הזה
         top_clades = [c for c in clades if getattr(c, "score", 0) == max_score]
 
-        # בטיחות: קח שדות רק אם קיימים
+        # בטיחות: קח שדות רק אם קיימים 
         name = getattr(Final_clade, "name", "Unknown")
         age_info = getattr(Final_clade, "age_info", None)
         tmrca = getattr(age_info, "most_recent_common_ancestor", "Unknown") if age_info else "Unknown"
@@ -340,7 +349,8 @@ def run_calculate_clade():
 
         # הצגת התוצאה במסך
         result_var.set(
-            f"YFull Final clade:\n"
+            f"ref_in_dna_file:     {last_dna_file_type}\n"
+            f"YFull predicted clade (used ref {last_ref_type}):\n"
             f" Name:    {name}\n"
             f" TMRCA:   {tmrca} ybp\n"
             f" FORMED:  {formed} ybp"
@@ -471,11 +481,25 @@ ref_var = tk.StringVar(value="Aautodetect")
 tk.Radiobutton(root, text="Aautodetect Reference File", variable=ref_var, value="Aautodetect").grid(row=0, column=0, padx=5, pady=5)
 tk.Radiobutton(root, text="Manual reference File (VCF/VCF.GZ)", variable=ref_var, value="ask").grid(row=0, column=1, padx=5, pady=5)
 
+def unload_ref():
+    global reference_snps, reference_names, last_reference_file, reference_loaded
+    reference_snps = {}      # pos -> ref_snp_name + ref_allele
+    reference_names = {}      # id_snp_name -> pos
+    last_reference_file = ""
+    reference_loaded = False
+    reference_loading_label.config(text="No reference_file loaded", fg="red")
+    btn_unload_ref.grid_forget()
+    reset_user()
+
+# כפתור הדבקה משמאל עם בדיקה
+btn_unload_ref = tk.Button(root, text="unload", command=unload_ref)
+# המיקום גריד שלו מתבצע בפונקציית 
+
 btn_csv = tk.Button(root, text=" Click To Choose RAW_DNA_File & Analyze", command=load_dna_file)
 btn_csv.grid(row=1, column=1, padx=5, pady=5)
 
 reference_loading_label = tk.Label(root, text="No reference_file loaded", fg="red")
-reference_loading_label.grid(row=2, column=0, columnspan=3, padx=5, pady=5)
+reference_loading_label.grid(row=2, column=1, padx=5, pady=5)
 
 dna_loading_label = tk.Label(root, text="No DNA_file loaded", fg="red")
 dna_loading_label.grid(row=3, column=0, columnspan=3, padx=5, pady=5)
