@@ -39,7 +39,7 @@ def reset_user():
     btn_yfull.grid_forget()
     btn_ftdna.grid_forget()
     dna_loading_label.config(text="No DNA_file loaded", fg="red")
-    yclade_label.config(text="")
+    yclade_label.config(text="load user DNA file", fg="red")
     user_result_var.set("")
     user_result_label.config(text="", bg="SystemButtonFace")
     btn_save_results.grid_forget()
@@ -296,7 +296,10 @@ def load_dna_file():
         dna_loading_label.config(fg="blue", text=f"DNA file loaded: \nname: {os.path.basename(file_path)} \n{len(user_snps)} total Y-rows  \n{len(positive_snps)} Positive Y-SNPs in DNA_file  \ntype: {last_dna_file_type}")
         user_loaded = True
         
-        run_calculate_clade()
+        if len(positive_snps) >= 100:
+            run_calculate_clade()
+        else:
+            yclade_label.config(text="female / incorrect reference \n(Too many Y positive variants)", fg="red")
 
     except Exception as e:
         messagebox.showerror("Error", f"Failed reading file: {e}")
@@ -348,7 +351,7 @@ def run_calculate_clade():
         last_yfull_link = f"https://www.yfull.com/tree/{name}/" if name != "Unknown" else False
         last_ftdna_link = f"https://discover.familytreedna.com/y-dna/{name}/tree/" if name != "Unknown" else False
         
-        warning = "\n\nwarning!: There is more result with the same 'score'\nOne of them may be wrong \nsave results and check it"
+        more_result_warning = "\n\nwarning!: There is more result with the same 'score'\nOne of them may be wrong \nsave results and check it"
             
         #ref_result_label.config(fg="green", bg="SystemButtonFace")
         
@@ -369,7 +372,7 @@ def run_calculate_clade():
         yclade_label.config(text="Analysis finished successfully.", fg="blue")
         
         if clades[0].score == clades[1].score:
-            yclade_label.config(text=warning, fg="red")
+            yclade_label.config(text=more_result_warning, fg="red")
         
 
     except Exception as e:
@@ -450,16 +453,17 @@ def check_search_input(ref_search = True):
         ref_result_label.config(fg="green", bg="SystemButtonFace")
     else:
         ref_result_var.set(f"{search_input} not found in reference file")
-        ref_result_label.config(fg="blue", bg="red")
+        ref_result_label.config(fg="blue", bg="yellow")
         
     if fields_user:
         user_result_var.set(fields_user)
-        user_result_label.config(fg="green", bg="SystemButtonFace")
+        fg_for_user_result_label = "green" if fields_user["is_positive"] == "Yes" else "red"
+        user_result_label.config(fg=fg_for_user_result_label, bg="SystemButtonFace")
         
     else:
         msg = f"{search_input} not found in user DNA_file" if user_loaded else "user DNA_file_not_loaded"
         user_result_var.set(msg)
-        user_result_label.config(fg="blue", bg="red")
+        user_result_label.config(fg="blue", bg="yellow")
     
         
         
@@ -518,13 +522,13 @@ btn_unload_ref = tk.Button(root, text="unload", command=unload_ref)
 btn_csv = tk.Button(root, text="Choose \nUser DNA File \nvcf/vcf.gz/txt/csv", command=load_dna_file)
 btn_csv.grid(row=1, column=4, rowspan=2)
 
-reference_loading_label = tk.Label(root, text="No reference_file loaded", fg="red")
+reference_loading_label = tk.Label(root, text="No reference-file loaded", fg="red")
 reference_loading_label.grid(row=4, column=0, padx=5, pady=5, rowspan=3)
 
-dna_loading_label = tk.Label(root, text="No DNA_file loaded", fg="red")
+dna_loading_label = tk.Label(root, text="No DNA-file loaded", fg="red")
 dna_loading_label.grid(row=4, column=4, padx=5, pady=5, rowspan=3)
 
-yclade_label = tk.Label(root, text="load user DNA file", anchor="w", fg="red")
+yclade_label = tk.Label(root, text="No DNA-file loaded", anchor="w", fg="red")
 yclade_label.grid(row=1, column=2, padx=5, pady=5)
 
 result_var = tk.StringVar()
