@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 import csv
 import os
 import re
@@ -21,6 +21,8 @@ last_reference_file = ""
 reference_loaded = False
 user_loaded = False
 last_dna_file_type = ""
+last_yfull_link = ""
+last_ftdna_link = ""
 
 # ------------------------
 # איפוס משתמש
@@ -34,8 +36,8 @@ def reset_user():
     user_loaded = False
 
     result_var.set("")
-    link_label_yfull.config(text="", fg="blue", cursor="")
-    link_label_ftdna.config(text="", fg="blue", cursor="")
+    btn_yfull.grid_forget()
+    btn_ftdna.grid_forget()
     dna_loading_label.config(text="No DNA_file loaded", fg="red")
     info_label.config(text="")
     user_result_var.set("")
@@ -122,7 +124,7 @@ def load_reference(ref_path="ask"):
                         reference_names[snp_name] = pos
                         
         reference_loaded = True
-        reference_loading_label.config(fg="blue", text=f"Reference loaded: {os.path.basename(ref_path)}  |  {len(reference_snps)} Y-SNPs  |  type: {last_ref_type}")
+        reference_loading_label.config(fg="blue", text=f"Reference loaded: \nname: {os.path.basename(ref_path)}  \n Y-SNPs: {len(reference_snps)}  \ntype: {last_ref_type}")
         last_reference_file = os.path.basename(ref_path)
         btn_unload_ref.grid(row=2, column=0, padx=5, pady=5)
         #update_buttons_state()
@@ -291,7 +293,7 @@ def load_dna_file():
         last_positive_snp_string = ", ".join(positive_snps)
         #print("Final positive SNPs:", last_positive_snp_string)
 
-        dna_loading_label.config(fg="blue", text=f"DNA file loaded: {os.path.basename(file_path)} {len(user_snps)} total Y-rows  |  {len(positive_snps)} Positive Y-SNPs in DNA_file  |  type: {last_dna_file_type}")
+        dna_loading_label.config(fg="blue", text=f"DNA file loaded: \nname: {os.path.basename(file_path)} \n{len(user_snps)} total Y-rows  \n{len(positive_snps)} Positive Y-SNPs in DNA_file  \ntype: {last_dna_file_type}")
         user_loaded = True
         
         run_calculate_clade()
@@ -342,8 +344,9 @@ def run_calculate_clade():
         tmrca = getattr(age_info, "most_recent_common_ancestor", "Unknown") if age_info else "Unknown"
         formed = getattr(age_info, "formed", "Unknown") if age_info else "Unknown"
 
-        YFull_Final_clade_Url = f"https://www.yfull.com/tree/{name}/" if name != "Unknown" else ""
-        FTDNA_Final_clade_Url = f"https://discover.familytreedna.com/y-dna/{name}/tree/" if name != "Unknown" else ""
+        global last_yfull_link, last_ftdna_link
+        last_yfull_link = f"https://www.yfull.com/tree/{name}/" if name != "Unknown" else False
+        last_ftdna_link = f"https://discover.familytreedna.com/y-dna/{name}/tree/" if name != "Unknown" else False
         
         warning = "\n\nwarning!: There is more result with the same 'score'\nOne of them may be wrong \nsave results and check it"
 
@@ -357,22 +360,17 @@ def run_calculate_clade():
             f"{warning if clades[0].score == clades[1].score else ''}"
         )
 
-        if YFull_Final_clade_Url:
-            link_label_yfull.config(text=f' LINK:     {YFull_Final_clade_Url}', fg="blue", cursor="hand2")
-            link_label_yfull.bind("<Button-1>", lambda e: webbrowser.open_new(YFull_Final_clade_Url))
-        
-        if FTDNA_Final_clade_Url:
-            link_label_ftdna.config(text=f' LINK:     {FTDNA_Final_clade_Url}', fg="blue", cursor="hand2")
-            link_label_ftdna.bind("<Button-1>", lambda e: webbrowser.open_new(FTDNA_Final_clade_Url))
-                
+        btn_yfull.grid(row=3, column=2, padx=5, pady=5)
+        btn_ftdna.grid(row=4, column=2, padx=5, pady=5)    
+        # מניחים את הלחצן רק אחרי שיש תוצאות
+        btn_save_results.grid(row=5, column=2, padx=5, pady=5)
+         
         info_label.config(text="Analysis finished successfully.")
         
-        # מניחים את הלחצן רק אחרי שיש תוצאות
-        btn_save_results.grid(row=9, column=0, columnspan=3, pady=5)
 
     except Exception as e:
         messagebox.showerror("Error", str(e))
-        #info_label.config(text="")
+        
 
 
 
@@ -408,7 +406,7 @@ def save_clades_to_file():
                 age = getattr(clade, 'age_info', None)
                 formed = getattr(age, 'formed', '') if age else ''
                 tmrca = getattr(age, 'most_recent_common_ancestor', '') if age else ''
-                YFull_Final_clade_Url = f"https://www.yfull.com/tree/{name}" if name != "Unknown" else ""
+                last_yfull_link = f"https://www.yfull.com/tree/{name}" if name != "Unknown" else ""
                 line = f"Name: {name},     Score: {score}, Formed: {formed}, TMRCA: {tmrca},     Link: {YFull_Final_clade_Url}\n\n"
                 f.write(line)
 
@@ -468,19 +466,8 @@ def paste_from_clipboard():
     clipboard_text = root.clipboard_get().strip()[:15]
     entry_search.delete(0, tk.END)
     entry_search.insert(0, clipboard_text)
-
-# ------------------------
-# GUI
-# ------------------------
-root = tk.Tk()
-root.title("Y_Tree SNP Analyzer | by Dr. simcha-gershon Bohrer (Phd.) | versin: 17 sep 2025")
-
-# יצירת כפתורי רדיו
-# משתנה בחירה (מחזיק את הערך של הכפתור הנבחר)
-ref_var = tk.StringVar(value="Aautodetect")
-tk.Radiobutton(root, text="Aautodetect Reference File", variable=ref_var, value="Aautodetect").grid(row=0, column=0, padx=5, pady=5)
-tk.Radiobutton(root, text="Manual reference File (VCF/VCF.GZ)", variable=ref_var, value="ask").grid(row=0, column=1, padx=5, pady=5)
-
+    
+    
 def unload_ref():
     global reference_snps, reference_names, last_reference_file, reference_loaded
     reference_snps = {}      # pos -> ref_snp_name + ref_allele
@@ -491,64 +478,92 @@ def unload_ref():
     btn_unload_ref.grid_forget()
     reset_user()
 
+
+# ------------------------
+# GUI
+# ------------------------
+root = tk.Tk()
+# קביעת גודל התחלתי (רוחב x גובה)
+#root.geometry("650x500")
+
+# קביעת מינימום גודל
+#root.minsize(500, 500)
+
+root.title("Y_Tree SNP Analyzer | by Dr. simcha-gershon Bohrer (Phd.) | versin: 18 sep 2025")
+
+# מפריד אנכי
+ttk.Separator(root, orient="vertical").grid(row=0, column=1, sticky="ns", padx=5, rowspan=20)
+ttk.Separator(root, orient="vertical").grid(row=0, column=3, sticky="ns", padx=5, rowspan=20)
+
+
+tk.Label(root, text="Reference file", font="david 14 bold").grid(row=0, column=0, padx=75, pady=10)
+tk.Label(root, text="Yclade", font="david 14 bold").grid(row=0, column=2, padx=75, pady=10)
+tk.Label(root, text="User DNA file", font="david 14 bold").grid(row=0, column=4, padx=75, pady=10)
+
+
+# יצירת כפתורי רדיו
+# משתנה בחירה (מחזיק את הערך של הכפתור הנבחר)
+ref_var = tk.StringVar(value="Aautodetect")
+tk.Radiobutton(root, text="Aautodetect Reference File     ", variable=ref_var, value="Aautodetect").grid(row=1, column=0)
+tk.Radiobutton(root, text="Ask Reference File (vcf/vcf.gz)", variable=ref_var, value="ask").grid(row=2, column=0)
+
 # כפתור הדבקה משמאל עם בדיקה
 btn_unload_ref = tk.Button(root, text="unload", command=unload_ref)
 # המיקום גריד שלו מתבצע בפונקציית 
 
-btn_csv = tk.Button(root, text=" Click To Choose RAW_DNA_File & Analyze", command=load_dna_file)
-btn_csv.grid(row=1, column=1, padx=5, pady=5)
+btn_csv = tk.Button(root, text="Choose \nUser DNA File \nvcf/vcf.gz/txt/csv", command=load_dna_file)
+btn_csv.grid(row=1, column=4, rowspan=2)
 
 reference_loading_label = tk.Label(root, text="No reference_file loaded", fg="red")
-reference_loading_label.grid(row=2, column=1, padx=5, pady=5)
+reference_loading_label.grid(row=3, column=0, padx=5, pady=5, rowspan=3)
 
 dna_loading_label = tk.Label(root, text="No DNA_file loaded", fg="red")
-dna_loading_label.grid(row=3, column=0, columnspan=3, padx=5, pady=5)
+dna_loading_label.grid(row=3, column=4, padx=5, pady=5, rowspan=3)
 
 info_label = tk.Label(root, text="", anchor="w", justify="left")
-info_label.grid(row=4, column=0, columnspan=3, padx=5, pady=5)
+info_label.grid(row=1, column=2, padx=5, pady=5)
 
 result_var = tk.StringVar()
 result_label = tk.Label(root, textvariable=result_var, justify="left", fg="green")
-result_label.grid(row=6, column=0, columnspan=3, padx=5, pady=10)
+result_label.grid(row=2, column=2, padx=5, pady=10)
+result_var.set("load user DNA file")
 
-link_label_yfull = tk.Label(root, text="", fg="blue", cursor="")
-link_label_yfull.grid(row=7, column=0, columnspan=3, padx=5, pady=5)
+def open_yfull():
+    webbrowser.open_new(last_yfull_link)
+def open_ftdna():
+    webbrowser.open_new(last_ftdna_link)
 
-link_label_ftdna = tk.Label(root, text="", fg="blue", cursor="")
-link_label_ftdna.grid(row=8, column=0, columnspan=3, padx=5, pady=5)
-
-
+btn_yfull = tk.Button(root, text="open clade in Yfull Tree", command=open_yfull)
+btn_ftdna = tk.Button(root, text="open clade in FTDNA Tree", command=open_ftdna)
 btn_save_results = tk.Button(root, text="Save Clades to TXT", command=save_clades_to_file)
-# המיקום גריד שלו מתבצע בפונקציית כלכולייט קלייד
+# הגריד שלהם נמצא בפונקציית חישוב הקלייד
 
 # בדיקת מיקום גנומי עם הכיתוב hg38
-tk.Label(root, text="_____________________________").grid(row=10, column=1, sticky="e")
+ttk.Separator(root, orient="horizontal").grid(row=10, column=2, sticky="ew", padx=5, pady=30)
+tk.Label(root, text="Check Y-SNP", font="david 14 bold").grid(row=11, column=2, padx=5, pady=5)
 
 # כפתור הדבקה משמאל עם בדיקה
 btn_paste = tk.Button(root, text="Paste", command=paste_from_clipboard)
 btn_paste.grid(row=12, column=2, padx=5, pady=5)
 
-# בדיקת מיקום גנומי עם הכיתוב hg38
-tk.Label(root, text="Reference:").grid(row=13, column=0, sticky="we")
-
-# בדיקת מיקום גנומי עם הכיתוב hg38
-tk.Label(root, text="User:").grid(row=13, column=3, sticky="we")
-
 # בדיקת מיקום גנומי (עם תווית שמציינת hg38/hg19)
 entry_search = tk.Entry(root, width=15)
-entry_search.grid(row=13, column=1, padx=5, pady=5)
+entry_search.grid(row=13, column=2, padx=5, pady=5)
 
 # כפתור בדיקה בנתוני המשתמש
 btn_check = tk.Button(root, text="Check Y-SNP", command=check_search_input) 
-btn_check.grid(row=14, column=1, padx=5, pady=5)
+btn_check.grid(row=14, column=2, padx=5, pady=5)
     
 ref_result_var = tk.StringVar()
-ref_result_label = tk.Label(root, textvariable=ref_result_var, justify="left", fg="green")
-ref_result_label.grid(row=14, column=0, padx=5, pady=10)
+ref_result_label = tk.Label(root, textvariable=ref_result_var, fg="green")
+ref_result_label.grid(row=14, column=0)
 
 user_result_var = tk.StringVar()
-user_result_label = tk.Label(root, textvariable=user_result_var, justify="left", fg="green")
-user_result_label.grid(row=14, column=2, padx=5, pady=10)
+user_result_label = tk.Label(root, textvariable=user_result_var, fg="green")
+user_result_label.grid(row=14, column=4)
+
+tk.Label(root, text="").grid(row=15, column=2, padx=5, pady=5)
+
 
 root.mainloop()
 
