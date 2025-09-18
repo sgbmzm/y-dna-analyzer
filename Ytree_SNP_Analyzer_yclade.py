@@ -442,7 +442,7 @@ def save_clades_to_file():
                 formed = getattr(age, 'formed', '') if age else ''
                 tmrca = getattr(age, 'most_recent_common_ancestor', '') if age else ''
                 last_yfull_link = f"https://www.yfull.com/tree/{name}" if name != "Unknown" else ""
-                line = f"Name: {name},     Score: {score}, Formed: {formed}, TMRCA: {tmrca},     Link: {YFull_Final_clade_Url}\n\n"
+                line = f"Name: {name},     Score: {score}, Formed: {formed}, TMRCA: {tmrca},     Link: {last_yfull_link}\n\n"
                 f.write(line)
 
         messagebox.showinfo("Success", f"Results saved to {file_path}")
