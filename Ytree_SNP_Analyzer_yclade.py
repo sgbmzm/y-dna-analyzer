@@ -218,12 +218,27 @@ def load_dna_file():
                 
                 if is_vcf_file:
                     # לקובץ ויסיאף יש סדר מסויים ומוקפד לעמודות
-                    chrom, pos_str, rsid, ref, alt, qual = parts[:6]
+                    chrom, pos_str, rsid, ref, alt = parts[:5]
+                    format_fields = parts[8].split(":")              # לדוגמה ["GT","AD","DP","GQ","PL"]
                     sample_index = 0 # לפעמים יש כמה נבדקים שונים וכל אחד מהם בטור אחד אחרי השני כאן מדובר באחד בלבד
                     sample_info = parts[9 + sample_index].split(":") # זה מכיל את כל המידע על נתוני הנבדק הנוכחי וכדלהלן
-                    gt_str = sample_info[0] # לוקח רק את החלק של ה־GT (למשל "0/1" או "1/1"
-                    ad_str = sample_info[1] # לוקח כמה קריאות לכל ווריאנט לדוגמא: 17,0 אומר 17 קריאות כמו הרפרנס ואפס קריאות כמו ה-אלט 
-                    dp_str = sample_info[2] # כמה קריאות היו בסך הכל
+                    sample_dict = dict(zip(format_fields, sample_info)) # הופך למילון: {"GT":"0/0", "AD":"13,0", ...}
+                    # עכשיו אפשר לגשת בצורה בטוחה:
+                    gt_str = sample_dict.get("GT") # לוקח רק את החלק של ה־GT (למשל "0/1" או "1/1"
+                    ad_str = sample_dict.get("AD") # לוקח כמה קריאות לכל ווריאנט לדוגמא: 17,0 אומר 17 קריאות כמו הרפרנס ואפס קריאות כמו ה-אלט 
+                    dp_str = sample_dict.get("DP") # כמה קריאות היו בסך הכל
+                    pl_str = sample_dict.get("PL") # הסתברויות לכל קריאה
+                    
+                    '''
+                    # הכנה לבדיקת איכות הקריאה לפי עומק הקריאה של החיובי לעומת השלילי
+                    if ad_str:
+                        ref_count, alt_count = map(int, ad_str.split(","))
+                        # תנאים:
+                        # 1. ALT לפחות פי 3 מ-REF
+                        # 2. ALT לפחות 10 קריאות
+                        if not alt_count >= 3 * ref_count and alt_count >= 5:
+                            continue
+                    '''
                     
                     alleles = [int(a) for a in re.split("[/|]", gt_str) if a.isdigit()]
                     if any(a > 0 for a in alleles): # כלומר אם יש שם משהו שהוא 1 אז יש משהו חיובי וזה אומר שהוא כמו ה alt
@@ -420,14 +435,18 @@ def check_search_input(ref_search = True):
             
     if fields_reference:
         ref_result_var.set(fields_reference)
+        ref_result_label.config(fg="green", bg="SystemButtonFace")
     else:
         ref_result_var.set(f"{search_input} not found in reference file")
         ref_result_label.config(fg="blue", bg="red")
         
     if fields_user:
         user_result_var.set(fields_user)
+        user_result_label.config(fg="green", bg="SystemButtonFace")
+        
     else:
-        user_result_var.set(f"{search_input} not found in user DNA_file")
+        msg = f"{search_input} not found in user DNA_file" if user_loaded else "user DNA_file_not_loaded"
+        user_result_var.set(msg)
         user_result_label.config(fg="blue", bg="red")
     
         
