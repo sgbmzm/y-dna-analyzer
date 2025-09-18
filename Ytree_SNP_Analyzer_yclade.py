@@ -39,11 +39,10 @@ def reset_user():
     btn_yfull.grid_forget()
     btn_ftdna.grid_forget()
     dna_loading_label.config(text="No DNA_file loaded", fg="red")
-    info_label.config(text="")
+    yclade_label.config(text="")
     user_result_var.set("")
     user_result_label.config(text="", bg="SystemButtonFace")
     btn_save_results.grid_forget()
-    btn_unload_ref.grid_forget()
     last_dna_file_type = ""
     
     
@@ -126,7 +125,7 @@ def load_reference(ref_path="ask"):
         reference_loaded = True
         reference_loading_label.config(fg="blue", text=f"Reference loaded: \nname: {os.path.basename(ref_path)}  \n Y-SNPs: {len(reference_snps)}  \ntype: {last_ref_type}")
         last_reference_file = os.path.basename(ref_path)
-        btn_unload_ref.grid(row=2, column=0, padx=5, pady=5)
+        btn_unload_ref.grid(row=1, column=0, padx=5, pady=5)
         #update_buttons_state()
         
     except Exception as e:
@@ -154,8 +153,9 @@ def load_dna_file():
         return
     
     # בדיקת או בחירת הרפרנס המתאים לקובץ הדנא של המשתמש
+    ref_auto_detect = detect_reference(file_path)
+    
     if ref_var.get() == "Aautodetect":
-        ref_auto_detect = detect_reference(file_path)
         ref_path = "Msnps_hg19.vcf.gz" if ref_auto_detect == "hg19" else "snps_hg38.vcf.gz" if ref_auto_detect == "hg38" else "ask"
     
         if not ref_auto_detect:
@@ -308,11 +308,11 @@ def run_calculate_clade():
 
     if not last_positive_snp_string:
         result_var.set("No matching SNPs were found in the file")
-        info_label.config(text="Analysis finished - no matching SNPs found.")
+        yclade_label.config(text="Analysis finished - no matching SNPs found.")
         return
 
     try:
-        info_label.config(text="Running clade calculation...")
+        yclade_label.config(text="Running clade calculation...")
         root.update()
 
         # קריאה ל־yclade עם מחרוזת אחת
@@ -320,14 +320,14 @@ def run_calculate_clade():
             clades = yclade.find_clade(last_positive_snp_string)
         except Exception as e:
             messagebox.showerror("Error", f"yclade.find_clade failed: {e}")
-            info_label.config(text="")
+            yclade_label.config(text="")
             return
 
         last_clades = clades
 
         if not clades:
             result_var.set("No clades returned by yclade.")
-            info_label.config(text="Analysis finished - no clades returned.")
+            yclade_label.config(text="Analysis finished - no clades returned.")
             return
 
         Final_clade = clades[0]
@@ -349,7 +349,9 @@ def run_calculate_clade():
         last_ftdna_link = f"https://discover.familytreedna.com/y-dna/{name}/tree/" if name != "Unknown" else False
         
         warning = "\n\nwarning!: There is more result with the same 'score'\nOne of them may be wrong \nsave results and check it"
-
+            
+        #ref_result_label.config(fg="green", bg="SystemButtonFace")
+        
         # הצגת התוצאה במסך
         result_var.set(
             f"ref_in_dna_file:     {last_dna_file_type}\n"
@@ -357,7 +359,6 @@ def run_calculate_clade():
             f" Name:    {name}\n"
             f" TMRCA:   {tmrca} ybp\n"
             f" FORMED:  {formed} ybp"
-            f"{warning if clades[0].score == clades[1].score else ''}"
         )
 
         btn_yfull.grid(row=3, column=2, padx=5, pady=5)
@@ -365,7 +366,10 @@ def run_calculate_clade():
         # מניחים את הלחצן רק אחרי שיש תוצאות
         btn_save_results.grid(row=5, column=2, padx=5, pady=5)
          
-        info_label.config(text="Analysis finished successfully.")
+        yclade_label.config(text="Analysis finished successfully.", fg="blue")
+        
+        if clades[0].score == clades[1].score:
+            yclade_label.config(text=warning, fg="red")
         
 
     except Exception as e:
@@ -504,8 +508,8 @@ tk.Label(root, text="User DNA file", font="david 14 bold").grid(row=0, column=4,
 # יצירת כפתורי רדיו
 # משתנה בחירה (מחזיק את הערך של הכפתור הנבחר)
 ref_var = tk.StringVar(value="Aautodetect")
-tk.Radiobutton(root, text="Aautodetect Reference File     ", variable=ref_var, value="Aautodetect").grid(row=1, column=0)
-tk.Radiobutton(root, text="Ask Reference File (vcf/vcf.gz)", variable=ref_var, value="ask").grid(row=2, column=0)
+tk.Radiobutton(root, text="Aautodetect Reference File     ", variable=ref_var, value="Aautodetect").grid(row=2, column=0)
+tk.Radiobutton(root, text="Ask Reference File (vcf/vcf.gz)", variable=ref_var, value="ask").grid(row=3, column=0)
 
 # כפתור הדבקה משמאל עם בדיקה
 btn_unload_ref = tk.Button(root, text="unload", command=unload_ref)
@@ -515,18 +519,17 @@ btn_csv = tk.Button(root, text="Choose \nUser DNA File \nvcf/vcf.gz/txt/csv", co
 btn_csv.grid(row=1, column=4, rowspan=2)
 
 reference_loading_label = tk.Label(root, text="No reference_file loaded", fg="red")
-reference_loading_label.grid(row=3, column=0, padx=5, pady=5, rowspan=3)
+reference_loading_label.grid(row=4, column=0, padx=5, pady=5, rowspan=3)
 
 dna_loading_label = tk.Label(root, text="No DNA_file loaded", fg="red")
-dna_loading_label.grid(row=3, column=4, padx=5, pady=5, rowspan=3)
+dna_loading_label.grid(row=4, column=4, padx=5, pady=5, rowspan=3)
 
-info_label = tk.Label(root, text="", anchor="w", justify="left")
-info_label.grid(row=1, column=2, padx=5, pady=5)
+yclade_label = tk.Label(root, text="load user DNA file", anchor="w", fg="red")
+yclade_label.grid(row=1, column=2, padx=5, pady=5)
 
 result_var = tk.StringVar()
-result_label = tk.Label(root, textvariable=result_var, justify="left", fg="green")
+result_label = tk.Label(root, textvariable=result_var, fg="green")
 result_label.grid(row=2, column=2, padx=5, pady=10)
-result_var.set("load user DNA file")
 
 def open_yfull():
     webbrowser.open_new(last_yfull_link)
@@ -551,7 +554,7 @@ entry_search = tk.Entry(root, width=15)
 entry_search.grid(row=13, column=2, padx=5, pady=5)
 
 # כפתור בדיקה בנתוני המשתמש
-btn_check = tk.Button(root, text="Check Y-SNP", command=check_search_input) 
+btn_check = tk.Button(root, text="Check: SNP name / Genomic position", command=check_search_input) 
 btn_check.grid(row=14, column=2, padx=5, pady=5)
     
 ref_result_var = tk.StringVar()
@@ -562,7 +565,7 @@ user_result_var = tk.StringVar()
 user_result_label = tk.Label(root, textvariable=user_result_var, fg="green")
 user_result_label.grid(row=14, column=4)
 
-tk.Label(root, text="").grid(row=15, column=2, padx=5, pady=5)
+tk.Label(root, text="NOTE: Each reference has different positions").grid(row=15, column=2, padx=5, pady=5)
 
 
 root.mainloop()
