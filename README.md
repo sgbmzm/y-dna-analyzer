@@ -4,7 +4,7 @@ The code is for personal use only - not for profit
 
 This code is still a work in progress, and I expect to update it from time to time.
 
-It is recommended to run the code through the software https://thonny.org/
+It is recommended to run the python code through the software https://thonny.org/ **or A Windows-ready exe file is now available here: https://github.com/sgbmzm/Ytree_SNP_Analyzer_yclade/releases/download/Ytree_SNP_Analyzer_yclade/Ytree_SNP_Analyzer_yclade_19_sep_25.exe**
 
 Use the latest Reference file from here
 https://ybrowse.org/gbrowse2/gff/snps_hg38.vcf.gz
