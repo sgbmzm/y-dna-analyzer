@@ -60,7 +60,8 @@ def reset_user():
     btn_save_results.grid_forget()
     last_dna_file_type = ""
     
-    
+
+# פונקצייה לפתיחת קבצים שונים כל קובץ לפי סוג הפתיחה הדרוש
 def universal_opener(file_path, only_dna_if_zip=False):
     # אם זה קובץ דחוס בשיטת gz
     if file_path.endswith(".gz"):
@@ -71,24 +72,66 @@ def universal_opener(file_path, only_dna_if_zip=False):
         zf = zipfile.ZipFile(file_path, "r")
         # מניחים שמעוניינים דווקא בקובץ הראשון שיש בזיפ
         first_file_in_zip = zf.namelist()[0]    
+        ####################################################
         # בדיקה אם רוצים דווקא קובץ מייהירטייג
         if only_dna_if_zip:
             lower_file_name = first_file_in_zip.lower()
-            # תנאי: שיהיה גם במחרוזת השם "myheritage" וגם שהסיומת תתאים
-            if ("dna" not in lower_file_name or not lower_file_name.endswith(".csv")):
+            # תנאי: שיהיה גם במחרוזת השם "myheritage" וגם שהסיומת תתאים לקובץ של מייהירטייג
+            # וגם שהסיומת לא תהיה vcf כי אם כן זה קובץ של ftdna של תוצאות big-y
+            if ("dna" not in lower_file_name and not lower_file_name.endswith(".csv") and not lower_file_name.endswith(".vcf")):
                 messagebox.showerror("Error", f"Not Fund 'dna' in first filename in zip: {first_file_in_zip}")
                 zf.close()
                 return None
+        ####################################################
         # אם לא רוצים לוודא מייהירטייג אז מחזירים את הקובץ הראשון בזיפ
         inner_file = zf.open(first_file_in_zip)
         return io.TextIOWrapper(inner_file, encoding="utf-8")
     
     # אם זה קובץ רגיל
     else:
-        return open(file_path, "rt", encoding="utf-8")  
+        return open(file_path, "rt", encoding="utf-8")
     
+    
+# פונקצייה שמחזירה את השם של הקובץ הראשון בתוך זיפ שבדרך כלל הוא העיקרי
+def get_first_file_name_in_zip(zip_path):
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            return zf.namelist()[0]  # מחזיר את השם של הקובץ הראשון
+    except:
+        return None
+
+
+# זה מיוחד לקבצי y של ftdna למי שעושה בדיקת פמילי פינדר שלא כתוב בהם איזה רפרנס הם אבל הם hg38
+# פונקצייה שבודקת האם מסתיים רק ב gz ולא לדוגמא vcf.gz
+def is_gz_only(filename):
+    parts = filename.lower().split(".")
+    return parts[-1] == "gz" and len(parts) == 2  # רק סיומת אחת לפני ה-gz
+
+# פונקצייה שמנסה למצוא שם של הקובץ הפנימי שדחוס ב gz
+def get_gz_internal_filename(filepath):
+    try:
+        with open(filepath, 'rb') as f:
+            header = f.read(10)          # קופצים על ההדר
+            if header[2] != 8 or not header[3] & 0x08:  # בדיקה קצרה: קומפרסיה = deflate ו-FNAME
+                return None
+            name = b''
+            while (b := f.read(1)) not in (b'', b'\x00'):
+                name += b
+            return name.decode('latin-1')
+    except:
+        return None
+
+
 # פונקצייה לבדיקה האם כתוב בקובץ באיזה רפרנס הוא משתמש
 def detect_reference(file_path, what_detect="type"):
+       
+    #######################################################################            
+    if is_gz_only(file_path): # אם זה קובץ שמסתיים רק ב gz ולא vcf.gz וכדומה
+        internal_name = get_gz_internal_filename(file_path) # מנסה למצוא האם יש שם לקובץ הפנימי שבתוך הדחיסה
+        # אם יש שם ובתוך השם יש את המילה haplocaller סימן שזה קובץ y של ftdna ואני יודע שהוא hg38
+        if internal_name and "haplocaller" in internal_name:
+            return "hg38"
+   ############################################################################
     
     ref_map = {
         "hg19": ["build 37", "grch37", "hg19"],
@@ -251,7 +294,21 @@ def load_dna_file():
     positive_snps = []
     user_snps = {}
     
-    is_vcf_file = file_path.endswith(".vcf") or file_path.endswith(".vcf.gz")
+    ########################################################################################################
+      
+    # זה מטפל במקרה מיוחד של ביג Y של פטדנא שהוא בזיפ רגיל אבל הוא VCF
+    is_ftdna_big_y_vcf = file_path.endswith(".zip") and get_first_file_name_in_zip(file_path) and get_first_file_name_in_zip(file_path).endswith(".vcf")
+        
+    ##########################################################################################################
+    is_vcf_file = file_path.endswith(".vcf") or file_path.endswith(".vcf.gz") or is_ftdna_big_y_vcf
+    
+    '''
+    # כבר טופל לעיל במשתנה is_ftdna_big_y_vcf ונשאר כאן רק לזיכרון
+    if not is_vcf_file and file_path.endswith(".zip"):
+        first_file_nane_in_zip = get_first_file_name_in_zip(file_path)
+        if first_file_nane_in_zip and first_file_nane_in_zip.endswith(".vcf"):
+            is_vcf_file = True        
+    '''
     
     try:
         with universal_opener(file_path, only_dna_if_zip=True) as f:
