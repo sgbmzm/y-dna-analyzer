@@ -4,6 +4,8 @@ import csv
 import os
 import re
 import gzip
+import zipfile
+import io
 import yclade
 import webbrowser
 
@@ -59,6 +61,32 @@ def reset_user():
     last_dna_file_type = ""
     
     
+def universal_opener(file_path, only_dna_if_zip=False):
+    # אם זה קובץ דחוס בשיטת gz
+    if file_path.endswith(".gz"):
+        return gzip.open(file_path, "rt", encoding="utf-8")
+    
+    # אם זה קובץ דחוס בשיטת zip
+    elif file_path.endswith(".zip"):
+        zf = zipfile.ZipFile(file_path, "r")
+        # מניחים שמעוניינים דווקא בקובץ הראשון שיש בזיפ
+        first_file_in_zip = zf.namelist()[0]    
+        # בדיקה אם רוצים דווקא קובץ מייהירטייג
+        if only_dna_if_zip:
+            lower_file_name = first_file_in_zip.lower()
+            # תנאי: שיהיה גם במחרוזת השם "myheritage" וגם שהסיומת תתאים
+            if ("dna" not in lower_file_name or not lower_file_name.endswith(".csv")):
+                messagebox.showerror("Error", f"Not Fund 'dna' in first filename in zip: {first_file_in_zip}")
+                zf.close()
+                return None
+        # אם לא רוצים לוודא מייהירטייג אז מחזירים את הקובץ הראשון בזיפ
+        inner_file = zf.open(first_file_in_zip)
+        return io.TextIOWrapper(inner_file, encoding="utf-8")
+    
+    # אם זה קובץ רגיל
+    else:
+        return open(file_path, "rt", encoding="utf-8")  
+    
 # פונקצייה לבדיקה האם כתוב בקובץ באיזה רפרנס הוא משתמש
 def detect_reference(file_path, what_detect="type"):
     
@@ -67,9 +95,7 @@ def detect_reference(file_path, what_detect="type"):
         "hg38": ["build 38", "grch38", "hg38", "hg 38"],
     }
     
-    opener = gzip.open if file_path.endswith(".gz") else open
-    with opener(file_path, "rt", encoding="utf-8") as f:
-        
+    with universal_opener(file_path) as f:
         for line in f:
             if not line.startswith("#"):
                 break  # יציאה – כבר עברנו את ה-header
@@ -172,7 +198,7 @@ def load_dna_file():
     # בחירת קובץ הנא של המשתמש
     file_path = filedialog.askopenfilename(
         title="Select DNA file",
-        filetypes=[("DNA files", "*.txt *.csv *.gz *.vcf"), ("All files", "*.*")]
+        filetypes=[("DNA files", "*.txt *.csv *.gz *.zip *.vcf"), ("All files", "*.*")]
     )
     if not file_path:
         return
@@ -227,9 +253,8 @@ def load_dna_file():
     
     is_vcf_file = file_path.endswith(".vcf") or file_path.endswith(".vcf.gz")
     
-    opener = gzip.open if file_path.endswith(".gz") else open
-    try:  
-        with opener(file_path, "rt", encoding="utf-8") as f:
+    try:
+        with universal_opener(file_path, only_dna_if_zip=True) as f:
             header_found = False
             for line in f:
                 line = line.strip()
