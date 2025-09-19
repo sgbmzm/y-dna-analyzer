@@ -15,7 +15,9 @@ You also need the Reference file "Msnps_hg19.vcf.gz" that I made from the file h
 Both files should be in the folder where the code is saved.
 
 This code analyzes which branch of the Y chromosome tree the sample is on.
-It extracts Y chromosome data from raw files from FTDNA, MyHeritage, Ancestry, 23&Me, and from whole genome VCF files.
+It extracts Y chromosome data from raw files from FTDNA, MyHeritage, Ancestry, 23&Me, and from whole genome (or only-y) VCF files (including ftdna-big-y-vcf).
+**There is no need to extract the raw files. The current software can process them both when compressed and when extracted.**
+
 
 Some files contain only a small amount of Y chromosome information, so the result is a high branch that is not up-to-date.
 Usually, VCF files will yield a up-to-date branch
