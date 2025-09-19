@@ -4,6 +4,8 @@ import csv
 import os
 import re
 import gzip
+import zipfile
+import io
 import yclade
 import webbrowser
 
@@ -227,107 +229,117 @@ def load_dna_file():
     
     is_vcf_file = file_path.endswith(".vcf") or file_path.endswith(".vcf.gz")
     
-    opener = gzip.open if file_path.endswith(".gz") else open
     try:  
-        with opener(file_path, "rt", encoding="utf-8") as f:
-            header_found = False
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("##") or line.startswith("#"):
-                    continue
-                
-                if is_vcf_file:
-                    header_found = True
-                
-                # השורה הראשונה בלי # היא ה-header
-                if not header_found:
-                    # מזהים אוטומטית פסיקים או טאבים
-                    delimiter = "\t" if "\t" in line else ","
-                    header = [h.strip().strip('"') for h in line.split(delimiter)]
-                    header_found = True
-                    continue
 
-                # מזהים את הדלימיטר בשורה הנוכחית
-                delimiter = "\t" if "\t" in line else ","
-                parts = [p.strip().strip('"') for p in line.split(delimiter)]
-
-                if len(parts) < 4:
-                    continue  # דילוג על שורות לא תקינות
-                
-                if is_vcf_file:
-                    # לקובץ ויסיאף יש סדר מסויים ומוקפד לעמודות
-                    chrom, pos_str, rsid, ref, alt = parts[:5]
-                    format_fields = parts[8].split(":")              # לדוגמה ["GT","AD","DP","GQ","PL"]
-                    sample_index = 0 # לפעמים יש כמה נבדקים שונים וכל אחד מהם בטור אחד אחרי השני כאן מדובר באחד בלבד
-                    sample_info = parts[9 + sample_index].split(":") # זה מכיל את כל המידע על נתוני הנבדק הנוכחי וכדלהלן
-                    sample_dict = dict(zip(format_fields, sample_info)) # הופך למילון: {"GT":"0/0", "AD":"13,0", ...}
-                    # עכשיו אפשר לגשת בצורה בטוחה:
-                    gt_str = sample_dict.get("GT") # לוקח רק את החלק של ה־GT (למשל "0/1" או "1/1"
-                    ad_str = sample_dict.get("AD") # לוקח כמה קריאות לכל ווריאנט לדוגמא: 17,0 אומר 17 קריאות כמו הרפרנס ואפס קריאות כמו ה-אלט 
-                    dp_str = sample_dict.get("DP") # כמה קריאות היו בסך הכל
-                    pl_str = sample_dict.get("PL") # הסתברויות לכל קריאה
-                    
-                    '''
-                    # הכנה לבדיקת איכות הקריאה לפי עומק הקריאה של החיובי לעומת השלילי
-                    if ad_str:
-                        ref_count, alt_count = map(int, ad_str.split(","))
-                        # תנאים:
-                        # 1. ALT לפחות פי 3 מ-REF
-                        # 2. ALT לפחות 10 קריאות
-                        if not alt_count >= 3 * ref_count and alt_count >= 5:
-                            continue
-                    '''
-                    
-                    alleles = [int(a) for a in re.split("[/|]", gt_str) if a.isdigit()]
-                    if any(a > 0 for a in alleles): # כלומר אם יש שם משהו שהוא 1 אז יש משהו חיובי וזה אומר שהוא כמו ה alt
-                        is_positive = True
-                        alleles_str = alt
-                    else:
-                        is_positive = False
-                        alleles_str = ref
-                else: # זה לא ויסיאף אלא קובץ שרובו אוטוזומלי מהחברות הקטנות כמו מייהירטייג אנססטרי וכו ומכיל מעט מידע על כרומזום Y
-                    # השדות הראשונים תמיד הם: rsid, chrom, pos, alleles
-                    rsid, chrom, pos_str, alleles_str = parts[:4]
-                    ad_str = ""
-                
-                # עושה אלל אחד גדול גם היה קטן וגם אם היו שניים יחד
-                allele_str = alleles_str.upper().strip()[0] if alleles_str else ""
-            
-                # נרמול שם הכרומוזום ל־Y
-                chrom = chrom.replace("chr", "").upper()
-                if chrom not in ("Y", "24"):
-                    continue
-                
-                
-                # הוספת השורה למילון המשתמש לאחר שוודאנו שמובר בשורה של Y
-                user_snps[int(pos_str)] = {"chrom": chrom, "pos_str": pos_str, "ref": ref_auto_detect, "snp_name": "?", "allele": allele_str, "is_positive": "?", "ad-R/A": ad_str}
-                
-                # בדיקה מול הרפרנס
-                if not pos_str.isdigit():
-                    continue
-                ref_info = reference_snps.get(int(pos_str))
-                if not ref_info:
-                    continue
-
-                if allele_str == ref_info["alt"]:
-                    s = f"{ref_info['name']}+"
-                    positive_snps.append(s)
-                    user_snps[int(pos_str)]["is_positive"] = "Yes"   # או "כן" / "+" או כל מה שאתה רוצה
-                    user_snps[int(pos_str)]["snp_name"] = ref_info['name']
-                elif allele_str == ref_info["ref"] or allele_str == ".":
-                    user_snps[int(pos_str)]["is_positive"] = "No"
-                    user_snps[int(pos_str)]["snp_name"] = ref_info['name']
-
-        last_positive_snp_string = ", ".join(positive_snps)
-        #print("Final positive SNPs:", last_positive_snp_string)
-
-        dna_loading_label.config(fg="blue", text=f"DNA file loaded: \nname: {os.path.basename(file_path)} \n{len(user_snps)} total Y-rows  \n{len(positive_snps)} Positive Y-SNPs in DNA_file  \ntype: {last_dna_file_type}")
-        user_loaded = True
-        
-        if len(positive_snps) >= 100:
-            run_calculate_clade()
+        if file_path.endswith(".zip"):
+            with zipfile.ZipFile(file_path, "r") as zip_ref:
+                # לוקחים את הקובץ הראשון בפנים (בדרך כלל זה קובץ הדנ"א)
+                inner_name = zip_ref.namelist()[0]
+                with zip_ref.open(inner_name) as inner_file:
+                    f = io.TextIOWrapper(inner_file, encoding="utf-8")
+                    lines = f.readlines()
         else:
-            yclade_label.config(text="female / incorrect reference \n(Too little Y positive variants)", fg="red")
+            opener = gzip.open if file_path.endswith(".gz") else open
+    
+            with opener(file_path, "rt", encoding="utf-8") as f:
+                header_found = False
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("##") or line.startswith("#"):
+                        continue
+                    
+                    if is_vcf_file:
+                        header_found = True
+                    
+                    # השורה הראשונה בלי # היא ה-header
+                    if not header_found:
+                        # מזהים אוטומטית פסיקים או טאבים
+                        delimiter = "\t" if "\t" in line else ","
+                        header = [h.strip().strip('"') for h in line.split(delimiter)]
+                        header_found = True
+                        continue
+    
+                    # מזהים את הדלימיטר בשורה הנוכחית
+                    delimiter = "\t" if "\t" in line else ","
+                    parts = [p.strip().strip('"') for p in line.split(delimiter)]
+    
+                    if len(parts) < 4:
+                        continue  # דילוג על שורות לא תקינות
+                    
+                    if is_vcf_file:
+                        # לקובץ ויסיאף יש סדר מסויים ומוקפד לעמודות
+                        chrom, pos_str, rsid, ref, alt = parts[:5]
+                        format_fields = parts[8].split(":")              # לדוגמה ["GT","AD","DP","GQ","PL"]
+                        sample_index = 0 # לפעמים יש כמה נבדקים שונים וכל אחד מהם בטור אחד אחרי השני כאן מדובר באחד בלבד
+                        sample_info = parts[9 + sample_index].split(":") # זה מכיל את כל המידע על נתוני הנבדק הנוכחי וכדלהלן
+                        sample_dict = dict(zip(format_fields, sample_info)) # הופך למילון: {"GT":"0/0", "AD":"13,0", ...}
+                        # עכשיו אפשר לגשת בצורה בטוחה:
+                        gt_str = sample_dict.get("GT") # לוקח רק את החלק של ה־GT (למשל "0/1" או "1/1"
+                        ad_str = sample_dict.get("AD") # לוקח כמה קריאות לכל ווריאנט לדוגמא: 17,0 אומר 17 קריאות כמו הרפרנס ואפס קריאות כמו ה-אלט 
+                        dp_str = sample_dict.get("DP") # כמה קריאות היו בסך הכל
+                        pl_str = sample_dict.get("PL") # הסתברויות לכל קריאה
+                        
+                        '''
+                        # הכנה לבדיקת איכות הקריאה לפי עומק הקריאה של החיובי לעומת השלילי
+                        if ad_str:
+                            ref_count, alt_count = map(int, ad_str.split(","))
+                            # תנאים:
+                            # 1. ALT לפחות פי 3 מ-REF
+                            # 2. ALT לפחות 10 קריאות
+                            if not alt_count >= 3 * ref_count and alt_count >= 5:
+                                continue
+                        '''
+                        
+                        alleles = [int(a) for a in re.split("[/|]", gt_str) if a.isdigit()]
+                        if any(a > 0 for a in alleles): # כלומר אם יש שם משהו שהוא 1 אז יש משהו חיובי וזה אומר שהוא כמו ה alt
+                            is_positive = True
+                            alleles_str = alt
+                        else:
+                            is_positive = False
+                            alleles_str = ref
+                    else: # זה לא ויסיאף אלא קובץ שרובו אוטוזומלי מהחברות הקטנות כמו מייהירטייג אנססטרי וכו ומכיל מעט מידע על כרומזום Y
+                        # השדות הראשונים תמיד הם: rsid, chrom, pos, alleles
+                        rsid, chrom, pos_str, alleles_str = parts[:4]
+                        ad_str = ""
+                    
+                    # עושה אלל אחד גדול גם היה קטן וגם אם היו שניים יחד
+                    allele_str = alleles_str.upper().strip()[0] if alleles_str else ""
+                
+                    # נרמול שם הכרומוזום ל־Y
+                    chrom = chrom.replace("chr", "").upper()
+                    if chrom not in ("Y", "24"):
+                        continue
+                    
+                    
+                    # הוספת השורה למילון המשתמש לאחר שוודאנו שמובר בשורה של Y
+                    user_snps[int(pos_str)] = {"chrom": chrom, "pos_str": pos_str, "ref": ref_auto_detect, "snp_name": "?", "allele": allele_str, "is_positive": "?", "ad-R/A": ad_str}
+                    
+                    # בדיקה מול הרפרנס
+                    if not pos_str.isdigit():
+                        continue
+                    ref_info = reference_snps.get(int(pos_str))
+                    if not ref_info:
+                        continue
+    
+                    if allele_str == ref_info["alt"]:
+                        s = f"{ref_info['name']}+"
+                        positive_snps.append(s)
+                        user_snps[int(pos_str)]["is_positive"] = "Yes"   # או "כן" / "+" או כל מה שאתה רוצה
+                        user_snps[int(pos_str)]["snp_name"] = ref_info['name']
+                    elif allele_str == ref_info["ref"] or allele_str == ".":
+                        user_snps[int(pos_str)]["is_positive"] = "No"
+                        user_snps[int(pos_str)]["snp_name"] = ref_info['name']
+    
+            last_positive_snp_string = ", ".join(positive_snps)
+            #print("Final positive SNPs:", last_positive_snp_string)
+    
+            dna_loading_label.config(fg="blue", text=f"DNA file loaded: \nname: {os.path.basename(file_path)} \n{len(user_snps)} total Y-rows  \n{len(positive_snps)} Positive Y-SNPs in DNA_file  \ntype: {last_dna_file_type}")
+            user_loaded = True
+            
+            if len(positive_snps) >= 100:
+                run_calculate_clade()
+            else:
+                yclade_label.config(text="female / incorrect reference \n(Too little Y positive variants)", fg="red")
 
     except Exception as e:
         messagebox.showerror("Error", f"Failed reading file: {e}")
