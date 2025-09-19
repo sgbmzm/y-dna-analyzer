@@ -30,3 +30,6 @@ This code was born only because of https://pypi.org/project/yclade/
 Thank them for that.
 
 This code was created in collaboration with GPT-Chat. It stopped a lot for me.
+
+<img width="1103" height="565" alt="image" src="https://github.com/user-attachments/assets/974282e7-91aa-4e73-b886-4983e8f15478" />
+
