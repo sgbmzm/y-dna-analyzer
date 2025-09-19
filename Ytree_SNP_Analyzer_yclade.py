@@ -172,7 +172,7 @@ def load_dna_file():
     # בחירת קובץ הנא של המשתמש
     file_path = filedialog.askopenfilename(
         title="Select DNA file",
-        filetypes=[("DNA files", "*.txt *.csv *.vcf *.vcf.gz"), ("All files", "*.*")]
+        filetypes=[("DNA files", "*.txt *.csv *.gz *.vcf"), ("All files", "*.*")]
     )
     if not file_path:
         return
@@ -327,7 +327,7 @@ def load_dna_file():
         if len(positive_snps) >= 100:
             run_calculate_clade()
         else:
-            yclade_label.config(text="female / incorrect reference \n(Too many Y positive variants)", fg="red")
+            yclade_label.config(text="female / incorrect reference \n(Too little Y positive variants)", fg="red")
 
     except Exception as e:
         messagebox.showerror("Error", f"Failed reading file: {e}")
@@ -512,6 +512,8 @@ def unload_ref():
     reference_loaded = False
     reference_loading_label.config(text="No reference_file loaded", fg="red")
     btn_unload_ref.grid_forget()
+    ref_result_var.set("")
+    ref_result_label.config(text="", bg="SystemButtonFace")
     reset_user()
 
 
@@ -601,4 +603,3 @@ tk.Label(root, text="NOTE: Each reference has different positions").grid(row=15,
 
 
 root.mainloop()
-
