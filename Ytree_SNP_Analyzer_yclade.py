@@ -631,7 +631,7 @@ tk.Radiobutton(root, text="Ask Reference File (vcf/vcf.gz)", variable=ref_var, v
 btn_unload_ref = tk.Button(root, text="unload", command=unload_ref)
 # המיקום גריד שלו מתבצע בפונקציית 
 
-btn_csv = tk.Button(root, text="Choose \nUser DNA File \nvcf/vcf.gz/txt/csv", command=load_dna_file)
+btn_csv = tk.Button(root, text="Choose \nUser RAW-DNA File \nvcf/vcf.gz/txt/csv/gz/zip", command=load_dna_file)
 btn_csv.grid(row=1, column=4, rowspan=2)
 
 reference_loading_label = tk.Label(root, text="No reference-file loaded", fg="red")
