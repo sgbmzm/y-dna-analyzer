@@ -5,6 +5,7 @@ The code is for personal use only - not for profit
 This code is still a work in progress, and I expect to update it from time to time.
 
 **A Windows-ready exe file is now available here: https://github.com/sgbmzm/Ytree_SNP_Analyzer_yclade/releases/download/Ytree_SNP_Analyzer_yclade/Ytree_SNP_Analyzer_yclade_19_sep_25.exe**
+The file is not signed, because signing costs money, but there really are no viruses in it.
 
 or run the python code (It is recommended through the software https://thonny.org/) 
 
