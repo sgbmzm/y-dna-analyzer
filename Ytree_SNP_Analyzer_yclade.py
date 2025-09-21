@@ -6,8 +6,11 @@ import re
 import gzip
 import zipfile
 import io
-import yclade
 import webbrowser
+import yclade
+from yclade import tree, snps
+import networkx as nx
+
 
 # ------------------------
 # משתנים גלובליים
@@ -59,6 +62,100 @@ def reset_user():
     user_result_label.config(text="", bg="SystemButtonFace")
     btn_save_results.grid_forget()
     last_dna_file_type = ""
+    
+    
+    
+'''
+# זה לא עבד טוב וזה לשמירה בלבד
+הפוקצייה הבאה ברוך השם עובדת
+# פונקצייה מאוד חשובה שמחזירה את שמות כל ענפי הצאצאים שתחת ענף מסויים בוויפול
+def get_branch_and_descendants(snp_name: str, include_descendants: bool = True):
+    """מחזיר רשימת ענפים לפי SNP, כולל צאצאים אם include_descendants=True.
+       יוצר את tree_data בתוך הפונקציה.
+    """
+    # טען את העץ
+    tree_data = tree.get_yfull_tree_data(version=None, data_dir=None)
+    
+    snp_name = snps.SnpResults(positive={snp_name.rstrip("+-")}, negative=set())
+    
+    snp_name = snps.normalize_snp_results(snp_results=snp_name,snp_aliases=tree_data.snp_aliases)
+
+    # מציאת הצומת לפי ה-SNP
+    node = next(
+        (n for n, snps_set in tree_data.clade_snps.items() if snp_name.rstrip("+-") in snps_set),
+        None
+    )
+    if node is None:
+        raise ValueError(f"לא נמצא צומת מתאים ל-{snp_name}")
+
+    # קביעת הצמתים לכלול
+    nodes = [node] + list(nx.descendants(tree_data.graph, node)) if include_descendants else [node]
+
+    # מיון מהשורש לעלים
+    nodes_sorted = sorted(nodes, key=lambda n: len(list(nx.ancestors(tree_data.graph, n))))
+    
+    # זה לשימוש עתידי אם רוצים שיאסוף גם את רשימת כל הווריאנטים שתחת ענף מסויים
+    #snps_list = [tree_data.clade_snps.get(n, set()) for n in nodes_sorted]
+    
+    return nodes_sorted
+'''
+
+# פונקצייה מאוד חשובה שמחזירה את שמות כל ענפי הצאצאים שתחת ענף מסויים בוויפול
+def get_clade_and_descendants_lists(tree_data, snp_name: str, include_descendants: bool = True, merge_snps: bool = False):
+    
+    """מחזיר שתי רשימות מקבילות:
+       - כל שמות הקליידים (או רק הענף עצמו)
+       - כל ה-SNPים של אותם קליידים (או רשימה אחת מאוחדת אם merge_snps=True)
+       בסדר מהשורש לעלים.
+       
+       פרמטרים:
+           include_descendants: True - מחזיר את הענף וכל הצאצאים, False - רק הענף
+           merge_snps: True - מחזיר את כל ה-SNPים של הענף והצאצאים כרשימה אחת מאוחדת
+    """
+    
+    # נירמול ה-SNP לפי אליאסים
+    snp_results = snps.SnpResults(positive={snp_name.rstrip("+-")}, negative=set())
+    snp_results_normalized = snps.normalize_snp_results(
+        snp_results=snp_results,
+        snp_aliases=tree_data.snp_aliases
+    )
+    if not snp_results_normalized.positive:
+        raise ValueError(f"SNP {snp_name} לא נמצא בעץ לאחר נירמול")
+    canonical_snp = next(iter(snp_results_normalized.positive))
+
+    # מציאת הצומת הקנוני בעץ
+    node = None
+    for n, snps_set in tree_data.clade_snps.items():
+        if canonical_snp in snps_set:
+            node = n
+            break
+    if node is None:
+        raise ValueError(f"לא נמצא צומת מתאים ל-{snp_name}")
+
+    # קביעת הצמתים לכלול
+    if include_descendants:
+        descendants = nx.descendants(tree_data.graph, node)
+        nodes = [node] + list(descendants)
+    else:
+        nodes = [node]
+
+    # מיון לפי סדר מהשורש לעץ
+    def distance_from_root(n):
+        return len(list(nx.ancestors(tree_data.graph, n)))
+
+    nodes_sorted = sorted(nodes, key=distance_from_root)
+
+    # יצירת הרשימות
+    branch_names = nodes_sorted
+    snps_list = [tree_data.clade_snps.get(n, set()) for n in nodes_sorted]
+
+    if merge_snps:
+        snps_list = [set().union(*snps_list)]  # מאחד את כל ה-SNPים לרשימה אחת
+
+    return branch_names#, snps_list
+
+
+
     
 
 # פונקצייה לפתיחת קבצים שונים כל קובץ לפי סוג הפתיחה הדרוש
@@ -444,12 +541,72 @@ def run_calculate_clade():
             return
 
         Final_clade = clades[0]
+        
+        ####################################################################
+        ####################################################################
+        
+        # טעינת עץ ווייפול
+        tree_data = tree.get_yfull_tree_data(version=None, data_dir=None)
+
+        
+        file_path = "ab_groups.csv"  # כאן את שם הקובץ שלך
+
+        ab_data = []
+
+        with open(file_path, newline='', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile, delimiter=',')  # אם הקובץ מופרד בטאב, אחרת השתמש ב-','  
+            for row in reader:
+                # כל שורה היא מילון עם שמות העמודות כמפתחות
+                ab_data.append(row)
+                
+        for row in ab_data:
+            # אם אין מפתח 'sub_clades', ניצור אותו עם הערך "052"
+            if 'sub_clades' not in row and row['Final SNP'] != 'None':
+                row['sub_clades'] = get_clade_and_descendants_lists(tree_data, row['Final SNP'])
+                
+        
+        Final_clade_name = Final_clade.name
+        Final_clade_snp = Final_clade_name.split("-")[-1]
+        Final_clade_sub_clades = get_clade_and_descendants_lists(tree_data, Final_clade_snp)
+        
+        
+        ab_found_exact = False  # נמצא התאמה מדויקת ל-Final_clade_name
+        ab_found_partial = False  # נמצא התאמה חלקית ל-Final_clade_sub_clades
+        found_partial_rows = []
+
+        for row in ab_data:
+            sub_clades_list = row.get('sub_clades', [])
+            sub_clades_clean = [s.replace("*", "") for s in sub_clades_list]  # מסירים כוכביות
+
+            # בדיקה מדויקת לשם הקלייד
+            if Final_clade_name in sub_clades_clean:
+                print(f"\nהקלייד המדויק {Final_clade_name} נמצא בשורה של {row['AB-Group']}")
+                ab_found_exact = True
+
+            # בדיקה אם אחד מהענפים ברשימת Final_clade_sub_clades נמצא
+            if any(branch.replace("*", "") in sub_clades_clean for branch in Final_clade_sub_clades):
+                found_partial_rows.append(row)
+                ab_found_partial = True
+
+        # סיכום התוצאות
+        if not ab_found_exact and not ab_found_partial:
+            print("לא נמצאו תוצאות.")
+        else:
+            if ab_found_partial and not ab_found_exact:
+                print("נמצאו התאמות חלקיות בלבד עבור הרשימה:")
+                for r in found_partial_rows:
+                    #print(f"AB-Group: {r['AB-Group']}, Branches: {r.get('Branches', 'None')}")
+                    print(f"AB-Group: {r['AB-Group']}, Communities, {r['Communities']}, Branches: {r.get('sub_clades', [])}")
+                    
+
+        ###################################################################
+        ###################################################################
             
         # מוצאים את ה-score הגבוה ביותר
-        max_score = max(getattr(c, "score", 0) for c in clades)
+        #max_score = max(getattr(c, "score", 0) for c in clades)
 
         # לוקחים את כל הקלאדים עם ה-score הזה
-        top_clades = [c for c in clades if getattr(c, "score", 0) == max_score]
+        #top_clades = [c for c in clades if getattr(c, "score", 0) == max_score]
 
         # בטיחות: קח שדות רק אם קיימים 
         name = getattr(Final_clade, "name", "Unknown")
