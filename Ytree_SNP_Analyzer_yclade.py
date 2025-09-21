@@ -549,11 +549,11 @@ def run_calculate_clade():
         tree_data = tree.get_yfull_tree_data(version=None, data_dir=None)
 
         
-        file_path = "ab_groups.csv"  # כאן את שם הקובץ שלך
+        ab_groups_path = resource_path("ab_groups.csv")  # כאן את שם הקובץ שלך
 
         ab_data = []
 
-        with open(file_path, newline='', encoding='utf-8') as csvfile:
+        with open(ab_groups_path, newline='', encoding='utf-8') as csvfile:
             reader = csv.DictReader(csvfile, delimiter=',')  # אם הקובץ מופרד בטאב, אחרת השתמש ב-','  
             for row in reader:
                 # כל שורה היא מילון עם שמות העמודות כמפתחות
@@ -573,6 +573,7 @@ def run_calculate_clade():
         ab_found_exact = False  # נמצא התאמה מדויקת ל-Final_clade_name
         ab_found_partial = False  # נמצא התאמה חלקית ל-Final_clade_sub_clades
         found_partial_rows = []
+        found_exact_rows = []
 
         for row in ab_data:
             sub_clades_list = row.get('sub_clades', [])
@@ -582,6 +583,8 @@ def run_calculate_clade():
             if Final_clade_name in sub_clades_clean:
                 print(f"\nהקלייד המדויק {Final_clade_name} נמצא בשורה של {row['AB-Group']}")
                 ab_found_exact = True
+                found_exact_rows.append(row)
+                #last_ab_exact = f"{Final_clade_name} = {row['AB-Group']}"
 
             # בדיקה אם אחד מהענפים ברשימת Final_clade_sub_clades נמצא
             if any(branch.replace("*", "") in sub_clades_clean for branch in Final_clade_sub_clades):
@@ -591,13 +594,16 @@ def run_calculate_clade():
         # סיכום התוצאות
         if not ab_found_exact and not ab_found_partial:
             print("לא נמצאו תוצאות.")
-        else:
-            if ab_found_partial and not ab_found_exact:
-                print("נמצאו התאמות חלקיות בלבד עבור הרשימה:")
-                for r in found_partial_rows:
-                    #print(f"AB-Group: {r['AB-Group']}, Branches: {r.get('Branches', 'None')}")
-                    print(f"AB-Group: {r['AB-Group']}, Communities, {r['Communities']}, Branches: {r.get('sub_clades', [])}")
-                    
+        elif ab_found_partial and not ab_found_exact:
+            print("נמצאו התאמות חלקיות בלבד עבור הרשימה:")
+            last_ab_partial = found_partial_rows
+            for r in found_partial_rows:
+                #print(f"AB-Group: {r['AB-Group']}, Branches: {r.get('Branches', 'None')}")
+                print(f"AB-Group: {r['AB-Group']}, Communities, {r['Communities']}, Branches: {r.get('sub_clades', [])}")
+        
+        ab_exact_str = ", ".join([r['AB-Group'] for r in found_exact_rows])
+        ab_guess_str = ", ".join([r['AB-Group'] for r in found_partial_rows])
+        ################## להוסיף אזהרות אם נמצא יותר מאחד מדוייק כמו אצל J-Y37840 ###################        
 
         ###################################################################
         ###################################################################
@@ -622,13 +628,15 @@ def run_calculate_clade():
             
         #ref_result_label.config(fg="green", bg="SystemButtonFace")
         
+        
         # הצגת התוצאה במסך
         result_var.set(
             f"ref_in_dna_file:     {last_dna_file_type}\n"
             f"YFull predicted clade (used ref {last_ref_type}):\n"
             f" Name:    {name}\n"
             f" TMRCA:   {tmrca} ybp\n"
-            f" FORMED:  {formed} ybp"
+            f" FORMED:  {formed} ybp\n"
+            f"AB {f'exact: [{ab_exact_str}]' if ab_found_exact else f'may be: [{ab_guess_str}]'}"
         )
 
         btn_yfull.grid(row=3, column=2, padx=5, pady=5)
