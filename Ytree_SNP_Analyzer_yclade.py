@@ -778,7 +778,7 @@ root = tk.Tk()
 # קביעת מינימום גודל
 #root.minsize(500, 500)
 
-root.title("Y_Tree SNP Analyzer | by Dr. simcha-gershon Bohrer (Phd.) | versin: 19 sep 2025")
+root.title("Y_Tree SNP Analyzer | by Dr. simcha-gershon Bohrer (Phd.) | versin: 21 sep 2025")
 
 # מפריד אנכי
 ttk.Separator(root, orient="vertical").grid(row=0, column=1, sticky="ns", padx=5, rowspan=20)
