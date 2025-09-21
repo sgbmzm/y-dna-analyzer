@@ -1,5 +1,6 @@
 from yclade import tree, snps
 import networkx as nx
+import csv
 
 def get_clade_and_descendants_lists(
     tree_data, snp_name: str, include_descendants: bool = True, merge_snps: bool = False
@@ -60,8 +61,10 @@ tree_data = tree.get_yfull_tree_data(version=None, data_dir=None)
 
 # דוגמה: כל הענפים והצאצאים + מאחד את כל ה-SNPים לרשימה אחת
 branches_all, variants_all = get_clade_and_descendants_lists(
-    tree_data, "Y246321+", include_descendants=True, merge_snps=True
+    tree_data, "L243+", include_descendants=True, merge_snps=True
 )
 
 print("ענפים:", branches_all)
 print("SNPים מאוחדים:", variants_all)
+
+
