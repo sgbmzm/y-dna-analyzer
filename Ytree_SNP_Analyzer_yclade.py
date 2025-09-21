@@ -554,7 +554,7 @@ def run_calculate_clade():
         ab_data = []
 
         with open(ab_groups_path, newline='', encoding='utf-8') as csvfile:
-            reader = csv.DictReader(csvfile, delimiter=',')  # אם הקובץ מופרד בטאב, אחרת השתמש ב-','  
+            reader = csv.DictReader(csvfile, delimiter=',')  # אם הקובץ מופרד בפסיקים  
             for row in reader:
                 # כל שורה היא מילון עם שמות העמודות כמפתחות
                 ab_data.append(row)
@@ -601,8 +601,12 @@ def run_calculate_clade():
                 #print(f"AB-Group: {r['AB-Group']}, Branches: {r.get('Branches', 'None')}")
                 print(f"AB-Group: {r['AB-Group']}, Communities, {r['Communities']}, Branches: {r.get('sub_clades', [])}")
         
-        ab_exact_str = ", ".join([r['AB-Group'] for r in found_exact_rows])
-        ab_guess_str = ", ".join([r['AB-Group'] for r in found_partial_rows])
+        #ab_exact_str = ", ".join([r['AB-Group'] for r in found_exact_rows])
+        #ab_guess_str = ", ".join([r['AB-Group'] for r in found_partial_rows])
+        # A אומרת שיש בקבוצה הזו אשכנזים
+        ab_exact_str = ", ".join([f"{r['AB-Group']}{'(A)' if 'A' in r['Communities'] else ''}" for r in found_exact_rows])
+        ab_guess_str = ", ".join([f"{r['AB-Group']}{'(A)' if 'A' in r['Communities'] else ''}" for r in found_partial_rows])
+
         ################## להוסיף אזהרות אם נמצא יותר מאחד מדוייק כמו אצל J-Y37840 ###################        
 
         ###################################################################
@@ -636,7 +640,7 @@ def run_calculate_clade():
             f" Name:    {name}\n"
             f" TMRCA:   {tmrca} ybp\n"
             f" FORMED:  {formed} ybp\n"
-            f"AB {f'exact: [{ab_exact_str}]' if ab_found_exact else f'may be: [{ab_guess_str}]'}"
+            f"AB {f'exact: [{ab_exact_str}]' if ab_found_exact else f'if jewish, maybe in: [{ab_guess_str}]'}"
         )
 
         btn_yfull.grid(row=3, column=2, padx=5, pady=5)
@@ -850,3 +854,4 @@ tk.Label(root, text="NOTE: Each reference has different positions").grid(row=15,
 
 
 root.mainloop()
+
