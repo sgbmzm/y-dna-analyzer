@@ -11,6 +11,9 @@ import yclade
 from yclade import tree, snps
 import networkx as nx
 
+# טעינת עץ ווייפול
+yfull_tree_data = tree.get_yfull_tree_data(version=None, data_dir=None)
+
 
 # ------------------------
 # משתנים גלובליים
@@ -28,6 +31,7 @@ user_loaded = False
 last_dna_file_type = ""
 last_yfull_link = ""
 last_ftdna_link = ""
+last_ab_data = None
 
 
 # פונקצייה לקבל מיקום מוחלט של קובץ שאמור להיות כלול בתוכנה
@@ -512,9 +516,51 @@ def load_dna_file():
         messagebox.showerror("Error", f"Failed reading file: {e}")
         dna_loading_label.config(text="")
 
+
+# פונקציה שטוענת מקובץ את הנתונים על קבוצות אבותינו וענפי הצאצאים שלהם ויכולה גם לשמור לקובץ
+def get_ab_data():
+    
+    global last_ab_data, yfull_tree_data
+    
+    if last_ab_data: #  אם כבר הנתונים נטענו אין צורך לטעון אותם שוב מהקובץ
+        return
+    
+    ab_groups_path = resource_path("ab_groups.csv")  # כאן את שם הקובץ שלך
+    ab_data = []
+    # טעינת כל שורה בקובץ לתוך מילון
+    with open(ab_groups_path, newline='', encoding='utf-8') as csvfile:
+        reader = csv.DictReader(csvfile, delimiter=',')  # אם הקובץ מופרד בפסיקים  
+        for row in reader:
+            # כל שורה היא מילון עם שמות העמודות כמפתחות
+            ab_data.append(row)
+    # בדיקה האם קיימים נתונים על ענפי הצאצים של כל שורה ואם לא קיימים אז להוסיף אותם               
+    for row in ab_data:
+        # אם אין מפתח 'sub_clades', ניצור אותו עם הערך "052"
+        if 'sub_clades' not in row and row['Final SNP'] not in (None, '', 'None'):
+            row['sub_clades'] = get_clade_and_descendants_lists(yfull_tree_data, row['Final SNP'])
+    
+    last_ab_data = ab_data
+    
+    write = False
+    '''
+    # זה כרגע לא טוב כי זה מפריע לקריאה של השדה row['sub_clades'] ###= ast.literal_eval(row['sub_clades']) 
+    if write:
+        # כתיבה חזרה (דורכת על הקובץ המקורי)
+        fieldnames = list(ab_data[0].keys())  # שמות העמודות אחרי ההוספה
+        with open(ab_groups_path, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames, delimiter=',')
+            writer.writeheader()
+            writer.writerows(ab_data)
+    '''
+                        
+
+def ab_snp_predictor(snp_name_string):
+    global ab_data, yfull_tree_data
+    
+
                   
 def run_calculate_clade():
-    global last_clades, last_reference_file, ref_user_file, last_dna_file_type, last_ref_type
+    global last_clades, last_reference_file, ref_user_file, last_dna_file_type, last_ref_type, last_ab_data
 
     if not last_positive_snp_string:
         result_var.set("No matching SNPs were found in the file")
@@ -545,67 +591,47 @@ def run_calculate_clade():
         ####################################################################
         ####################################################################
         
-        # טעינת עץ ווייפול
-        tree_data = tree.get_yfull_tree_data(version=None, data_dir=None)
-
-        
-        ab_groups_path = resource_path("ab_groups.csv")  # כאן את שם הקובץ שלך
-
-        ab_data = []
-
-        with open(ab_groups_path, newline='', encoding='utf-8') as csvfile:
-            reader = csv.DictReader(csvfile, delimiter=',')  # אם הקובץ מופרד בפסיקים  
-            for row in reader:
-                # כל שורה היא מילון עם שמות העמודות כמפתחות
-                ab_data.append(row)
-                
-        for row in ab_data:
-            # אם אין מפתח 'sub_clades', ניצור אותו עם הערך "052"
-            if 'sub_clades' not in row and row['Final SNP'] != 'None':
-                row['sub_clades'] = get_clade_and_descendants_lists(tree_data, row['Final SNP'])
-                
-        
+             
         Final_clade_name = Final_clade.name
         Final_clade_snp = Final_clade_name.split("-")[-1]
-        Final_clade_sub_clades = get_clade_and_descendants_lists(tree_data, Final_clade_snp)
+        Final_clade_sub_clades = get_clade_and_descendants_lists(yfull_tree_data, Final_clade_snp)
         
         
-        ab_found_exact = False  # נמצא התאמה מדויקת ל-Final_clade_name
-        ab_found_partial = False  # נמצא התאמה חלקית ל-Final_clade_sub_clades
-        found_partial_rows = []
-        found_exact_rows = []
+        clade_found_ab = False  # נמצא התאמה מדויקת ל-Final_clade_name
+        sub_clades_found_ab = False  # נמצא התאמה חלקית ל-Final_clade_sub_clades
+        clade_found_ab_rows = []
+        sub_clades_found_ab_rows = []
 
-        for row in ab_data:
-            sub_clades_list = row.get('sub_clades', [])
-            sub_clades_clean = [s.replace("*", "") for s in sub_clades_list]  # מסירים כוכביות
+        for row in last_ab_data:
+            ab_clades_list = row.get('sub_clades', [])
+            ab_clades_clean = [s.replace("*", "") for s in ab_clades_list]  # מסירים כוכביות
 
             # בדיקה מדויקת לשם הקלייד
-            if Final_clade_name in sub_clades_clean:
+            if Final_clade_name in ab_clades_clean:
                 print(f"\nהקלייד המדויק {Final_clade_name} נמצא בשורה של {row['AB-Group']}")
-                ab_found_exact = True
-                found_exact_rows.append(row)
+                clade_found_ab = True
+                clade_found_ab_rows.append(row)
                 #last_ab_exact = f"{Final_clade_name} = {row['AB-Group']}"
 
             # בדיקה אם אחד מהענפים ברשימת Final_clade_sub_clades נמצא
-            if any(branch.replace("*", "") in sub_clades_clean for branch in Final_clade_sub_clades):
-                found_partial_rows.append(row)
-                ab_found_partial = True
+            if any(clade.replace("*", "") in ab_clades_clean for clade in Final_clade_sub_clades):
+                sub_clades_found_ab = True
+                sub_clades_found_ab_rows.append(row)
 
         # סיכום התוצאות
-        if not ab_found_exact and not ab_found_partial:
+        if not clade_found_ab and not sub_clades_found_ab:
             print("לא נמצאו תוצאות.")
-        elif ab_found_partial and not ab_found_exact:
-            print("נמצאו התאמות חלקיות בלבד עבור הרשימה:")
-            last_ab_partial = found_partial_rows
-            for r in found_partial_rows:
+        elif sub_clades_found_ab and not clade_found_ab:
+            print("ענף אבותינו נמצא רק באחד מתתי הענפים:")
+            for r in sub_clades_found_ab_rows:
                 #print(f"AB-Group: {r['AB-Group']}, Branches: {r.get('Branches', 'None')}")
                 print(f"AB-Group: {r['AB-Group']}, Communities, {r['Communities']}, Branches: {r.get('sub_clades', [])}")
         
         #ab_exact_str = ", ".join([r['AB-Group'] for r in found_exact_rows])
         #ab_guess_str = ", ".join([r['AB-Group'] for r in found_partial_rows])
         # A אומרת שיש בקבוצה הזו אשכנזים
-        ab_exact_str = ", ".join([f"{r['AB-Group']}{'(A)' if 'A' in r['Communities'] else ''}" for r in found_exact_rows])
-        ab_guess_str = ", ".join([f"{r['AB-Group']}{'(A)' if 'A' in r['Communities'] else ''}" for r in found_partial_rows])
+        ab_exact_str = ", ".join([f"{r['AB-Group']}{'(A)' if 'A' in r['Communities'] else ''}" for r in clade_found_ab_rows])
+        ab_guess_str = ", ".join([f"{r['AB-Group']}{'(A)' if 'A' in r['Communities'] else ''}" for r in sub_clades_found_ab_rows])
 
         ################## להוסיף אזהרות אם נמצא יותר מאחד מדוייק כמו אצל J-Y37840 ###################        
 
@@ -640,7 +666,7 @@ def run_calculate_clade():
             f" Name:    {name}\n"
             f" TMRCA:   {tmrca} ybp\n"
             f" FORMED:  {formed} ybp\n"
-            f"AB {f'exact: [{ab_exact_str}]' if ab_found_exact else f'if jewish, maybe in: [{ab_guess_str}]'}"
+            f"AB {f'exact: [{ab_exact_str}]' if clade_found_ab else f'if jewish, maybe in: [{ab_guess_str}]'}"
         )
 
         btn_yfull.grid(row=3, column=2, padx=5, pady=5)
@@ -852,6 +878,9 @@ user_result_label.grid(row=14, column=4)
 
 tk.Label(root, text="NOTE: Each reference has different positions").grid(row=15, column=2, padx=5, pady=5)
 
+get_ab_data()
+
 
 root.mainloop()
+
 
