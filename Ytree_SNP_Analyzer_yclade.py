@@ -8,7 +8,7 @@ import zipfile
 import io
 import webbrowser
 import yclade
-from yclade import tree, snps
+from yclade import tree, snps, find
 import networkx as nx
 
 # טעינת עץ ווייפול
@@ -553,15 +553,54 @@ def get_ab_data():
             writer.writerows(ab_data)
     '''
                         
-
-def ab_snp_predictor(snp_name_string):
-    global ab_data, yfull_tree_data
+# פונקצייה מאוד חשובה שמחזירה האם ענף מסויים נמצא בתוך קבוצת אבותינו או מעל אחת או יותר מקבוצות אבותינו
+def get_ab_from_clade(clade: str, from_snp = False):    # הצהרה על משתנים גלובליים
+    global last_ab_data, yfull_tree_data
+    # אם רוצים מסניפ אז צריך קודם לדעת אל איזה ענף הסניפ הזה יושב בעץ ואז ממשיכים עם הענף המתאים
+    if from_snp:
+        clade = yclade.find_clade(clade_snp)
+    # טיפול בבעייה שאין שם ווריאנט    
+    if not from_snp and "-" not in clade: # לדוגמא J2 שלא בנוי J2-M172 ולכן אין לנו שם ווריאנט
+        return "לא ניתן לחשב AB"
+    # הוצאת שם הווריאנט מתוך שם הענף דוגמא: J-L243 נהיה L243
+    clade_snp = clade.split("-")[-1] 
+    # חישוב כל הענפים שתחת הענף מחזיר רשימה
+    clade_sub_clades = get_clade_and_descendants_lists(yfull_tree_data, clade_snp)
     
+    # משתנים לצורך הספירה ומיכלים לאיסוף תוצאות
+    clade_found_ab = False  
+    sub_clades_found_ab = False  
+    clade_found_ab_rows = []
+    sub_clades_found_ab_rows = []
 
-                  
+    # עוברים על כל שורה של קבוצות אבותינו כלומר על כל קבוצה ובודקים עבור כל ענף וענף בקבוצה את הדברים הבאים
+    for row in last_ab_data:
+        ab_clades_list = row.get('sub_clades', [])
+        ab_clades_clean = [s.replace("*", "") for s in ab_clades_list]  # מסירים כוכביות
+
+        # בדיקה האם הענף המבוקש נמצא בתוך אחת מקבוצות אבותינו
+        if clade in ab_clades_clean:
+            clade_found_ab = True
+            clade_found_ab_rows.append(row)
+
+        # בדיקה האם אחד ממתי הענפים של הענף הנבוקש נמצא בתוך אחת מקבוצות אבותינו
+        if any(a_clade.replace("*", "") in ab_clades_clean for a_clade in clade_sub_clades):
+            sub_clades_found_ab = True
+            sub_clades_found_ab_rows.append(row)
+    
+    # A אומרת שיש בקבוצה הזו אשכנזים. זה אוסף לרשימה של כל קבוצות אבותינו שנמצאו
+    # בתוך ab אמור לצאת רק אחד ולא יותר אבל לפעמים יוצא יותר בגלל שיש ענפי ab שהענף שלהם מוגדר רחב ולא ספציפי ברשימה שבקובץ
+    in_ab = ", ".join([f"{r['AB-Group']}{'(A)' if 'A' in r['Communities'] else ''}" for r in clade_found_ab_rows])
+    above_ab = ", ".join([f"{r['AB-Group']}{'(A)' if 'A' in r['Communities'] else ''}" for r in sub_clades_found_ab_rows])
+    ab_string = f'in AB: \n[{in_ab}]' if in_ab else f'above ABs: \n[{above_ab}]' if above_ab else ""
+    # מחזירים את רשימת ענפי אבותינו שבתוך או שמעל    
+    return ab_string
+
+    
+               
 def run_calculate_clade():
-    global last_clades, last_reference_file, ref_user_file, last_dna_file_type, last_ref_type, last_ab_data
-
+    global last_positive_snp_string, last_clades, last_reference_file, ref_user_file, last_dna_file_type, last_ref_type, last_ab_data
+    result_var.set("") # תמיד לאפס קודם ולרוקן את הכיתוב הישן
     if not last_positive_snp_string:
         result_var.set("No matching SNPs were found in the file")
         yclade_label.config(text="Analysis finished - no matching SNPs found.")
@@ -573,7 +612,15 @@ def run_calculate_clade():
 
         # קריאה ל־yclade עם מחרוזת אחת
         try:
-            clades = yclade.find_clade(last_positive_snp_string)
+            
+            
+            # clades = yclade.find_clade(last_positive_snp_string) זו הדרך הרגילה אבל היא ארוכה כי צריך כל פעם לטעון את העץ מחדש
+            # לכן עושים את זה כך ישר על yfull_tree_data שכבר טעננו בתחילת הקוד פעם אחת
+            snp_results = snps.parse_snp_results(last_positive_snp_string)
+            snp_results = snps.normalize_snp_results(snp_results=snp_results, snp_aliases=yfull_tree_data.snp_aliases)
+            clades = find.get_ordered_clade_details(tree=yfull_tree_data, snps=snp_results)
+            
+                    
         except Exception as e:
             messagebox.showerror("Error", f"yclade.find_clade failed: {e}")
             yclade_label.config(text="")
@@ -585,59 +632,13 @@ def run_calculate_clade():
             result_var.set("No clades returned by yclade.")
             yclade_label.config(text="Analysis finished - no clades returned.")
             return
-
+        
+        # האחרון הוא בעל הציון הכי גבוה ולכן בדרך כלל הכי נכון
         Final_clade = clades[0]
+         
+        # קבלת מידע על קבוצת אבותינו שהענף נמצא בה או שהיא נמצאת תחת הענף באמצעות פונקציה
+        ab_string = get_ab_from_clade(Final_clade.name)
         
-        ####################################################################
-        ####################################################################
-        
-             
-        Final_clade_name = Final_clade.name
-        Final_clade_snp = Final_clade_name.split("-")[-1]
-        Final_clade_sub_clades = get_clade_and_descendants_lists(yfull_tree_data, Final_clade_snp)
-        
-        
-        clade_found_ab = False  # נמצא התאמה מדויקת ל-Final_clade_name
-        sub_clades_found_ab = False  # נמצא התאמה חלקית ל-Final_clade_sub_clades
-        clade_found_ab_rows = []
-        sub_clades_found_ab_rows = []
-
-        for row in last_ab_data:
-            ab_clades_list = row.get('sub_clades', [])
-            ab_clades_clean = [s.replace("*", "") for s in ab_clades_list]  # מסירים כוכביות
-
-            # בדיקה מדויקת לשם הקלייד
-            if Final_clade_name in ab_clades_clean:
-                print(f"\nהקלייד המדויק {Final_clade_name} נמצא בשורה של {row['AB-Group']}")
-                clade_found_ab = True
-                clade_found_ab_rows.append(row)
-                #last_ab_exact = f"{Final_clade_name} = {row['AB-Group']}"
-
-            # בדיקה אם אחד מהענפים ברשימת Final_clade_sub_clades נמצא
-            if any(clade.replace("*", "") in ab_clades_clean for clade in Final_clade_sub_clades):
-                sub_clades_found_ab = True
-                sub_clades_found_ab_rows.append(row)
-
-        # סיכום התוצאות
-        if not clade_found_ab and not sub_clades_found_ab:
-            print("לא נמצאו תוצאות.")
-        elif sub_clades_found_ab and not clade_found_ab:
-            print("ענף אבותינו נמצא רק באחד מתתי הענפים:")
-            for r in sub_clades_found_ab_rows:
-                #print(f"AB-Group: {r['AB-Group']}, Branches: {r.get('Branches', 'None')}")
-                print(f"AB-Group: {r['AB-Group']}, Communities, {r['Communities']}, Branches: {r.get('sub_clades', [])}")
-        
-        #ab_exact_str = ", ".join([r['AB-Group'] for r in found_exact_rows])
-        #ab_guess_str = ", ".join([r['AB-Group'] for r in found_partial_rows])
-        # A אומרת שיש בקבוצה הזו אשכנזים
-        ab_exact_str = ", ".join([f"{r['AB-Group']}{'(A)' if 'A' in r['Communities'] else ''}" for r in clade_found_ab_rows])
-        ab_guess_str = ", ".join([f"{r['AB-Group']}{'(A)' if 'A' in r['Communities'] else ''}" for r in sub_clades_found_ab_rows])
-
-        ################## להוסיף אזהרות אם נמצא יותר מאחד מדוייק כמו אצל J-Y37840 ###################        
-
-        ###################################################################
-        ###################################################################
-            
         # מוצאים את ה-score הגבוה ביותר
         #max_score = max(getattr(c, "score", 0) for c in clades)
 
@@ -666,7 +667,8 @@ def run_calculate_clade():
             f" Name:    {name}\n"
             f" TMRCA:   {tmrca} ybp\n"
             f" FORMED:  {formed} ybp\n"
-            f"AB {f'exact: [{ab_exact_str}]' if clade_found_ab else f'if jewish, maybe in: [{ab_guess_str}]'}"
+            f"{ab_string}\n"
+            f"yfull tree version. {yfull_tree_data.version}"
         )
 
         btn_yfull.grid(row=3, column=2, padx=5, pady=5)
@@ -676,7 +678,7 @@ def run_calculate_clade():
          
         yclade_label.config(text="Analysis finished successfully.", fg="blue")
         
-        if clades[0].score == clades[1].score:
+        if len(clades) >= 2 and clades[0].score == clades[1].score:
             yclade_label.config(text=more_result_warning, fg="red")
         
 
@@ -719,7 +721,9 @@ def save_clades_to_file():
                 formed = getattr(age, 'formed', '') if age else ''
                 tmrca = getattr(age, 'most_recent_common_ancestor', '') if age else ''
                 last_yfull_link = f"https://www.yfull.com/tree/{name}" if name != "Unknown" else ""
-                line = f"Name: {name},     Score: {score}, Formed: {formed}, TMRCA: {tmrca},     Link: {last_yfull_link}\n\n"
+                # קבלת מידע על קבוצת אבותינו שהענף נמצא בה או שהיא נמצאת תחת הענף באמצעות פונקציה
+                #ab_string = get_ab_from_clade(clade.name)
+                line = f"Name: {name},     Score: {score}, Formed: {formed}, TMRCA: {tmrca},   Link: {last_yfull_link}\n\n"
                 f.write(line)
 
         messagebox.showinfo("Success", f"Results saved to {file_path}")
@@ -732,7 +736,7 @@ def save_clades_to_file():
        
 def check_search_input(ref_search = True):
     
-    global reference_names, reference_snaps, user_snps, user_loaded, reference_loaded
+    global reference_names, reference_snaps, user_snps, user_loaded, reference_loaded, last_positive_snp_string
     
     if not reference_loaded:
         choice = messagebox.askyesnocancel("Reference not Autodetected", "Autodetected Reference faild\nChoose hg19, hg38, or select file manually.\n\nYes = hg19, No = hg38, Cancel = choose manually")
@@ -769,7 +773,11 @@ def check_search_input(ref_search = True):
         msg = f"{search_input} not found in user DNA_file" if user_loaded else "user DNA_file_not_loaded"
         user_result_var.set(msg)
         user_result_label.config(fg="blue", bg="yellow")
-    
+        
+    # במקרה שאין דנא של נבדק אז מריצים את חישוב המיקום על עץ ווייפול עבור הווריאנט המבוקש כאילו שהוא חיובי
+    if not user_loaded and fields_reference:
+        last_positive_snp_string = f"{fields_reference['name']}+"
+        run_calculate_clade()
         
         
 # ------------------------
@@ -804,7 +812,7 @@ root = tk.Tk()
 # קביעת מינימום גודל
 #root.minsize(500, 500)
 
-root.title("Y_Tree SNP Analyzer | by Dr. simcha-gershon Bohrer (Phd.) | versin: 21 sep 2025")
+root.title("Y_Tree SNP Analyzer | by Dr. simcha-gershon Bohrer (Phd.) | versin: 26 sep 2025")
 
 # מפריד אנכי
 ttk.Separator(root, orient="vertical").grid(row=0, column=1, sticky="ns", padx=5, rowspan=20)
