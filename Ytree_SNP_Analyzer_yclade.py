@@ -139,6 +139,7 @@ def get_clade_and_descendants_lists(tree_data, snp_name: str, include_descendant
     # קביעת הצמתים לכלול
     if include_descendants:
         descendants = nx.descendants(tree_data.graph, node)
+        #ancestors = nx.ancestors(tree_data.graph, node) # אם רוצים להחזיר את האבות ולא את הצאצאים
         nodes = [node] + list(descendants)
     else:
         nodes = [node]
@@ -552,18 +553,26 @@ def get_ab_data():
             writer.writeheader()
             writer.writerows(ab_data)
     '''
-                        
+
+
+# פונקצייה שמקבלת שם של ענף לדוגמא J2 או J-L243 ומחזירה את השם של הווריאנט שמגדיר אותו או את אחד מהם
+def get_snp_from_clade(clade: str):
+    if "-" not in clade: # לדוגמא J2 שלא בנוי J2-M172 ולכן אין לנו שם ווריאנט
+        clade_snp = list(yfull_tree_data.clade_snps[clade])[0] # מחזיר אחד מהווריאנטים שמגדירים את הענף הנוכחי
+    else:
+        # הוצאת שם הווריאנט מתוך שם הענף דוגמא: J-L243 נהיה L243
+        clade_snp = clade.split("-")[-1]
+    return clade_snp
+        
+                      
 # פונקצייה מאוד חשובה שמחזירה האם ענף מסויים נמצא בתוך קבוצת אבותינו או מעל אחת או יותר מקבוצות אבותינו
 def get_ab_from_clade(clade: str, from_snp = False):    # הצהרה על משתנים גלובליים
     global last_ab_data, yfull_tree_data
     # אם רוצים מסניפ אז צריך קודם לדעת אל איזה ענף הסניפ הזה יושב בעץ ואז ממשיכים עם הענף המתאים
     if from_snp:
         clade = yclade.find_clade(clade_snp)
-    # טיפול בבעייה שאין שם ווריאנט    
-    if not from_snp and "-" not in clade: # לדוגמא J2 שלא בנוי J2-M172 ולכן אין לנו שם ווריאנט
-        return "לא ניתן לחשב AB"
-    # הוצאת שם הווריאנט מתוך שם הענף דוגמא: J-L243 נהיה L243
-    clade_snp = clade.split("-")[-1] 
+    # מוציאם משם הקלייד את הווריאנט שמגדיר אותו באמצעות פונקצייה
+    clade_snp = get_snp_from_clade(clade)
     # חישוב כל הענפים שתחת הענף מחזיר רשימה
     clade_sub_clades = get_clade_and_descendants_lists(yfull_tree_data, clade_snp)
     
@@ -598,7 +607,7 @@ def get_ab_from_clade(clade: str, from_snp = False):    # הצהרה על משת
 
     
                
-def run_calculate_clade():
+def run_calculate_clade(Final_clade_index = 0):
     global last_positive_snp_string, last_clades, last_reference_file, ref_user_file, last_dna_file_type, last_ref_type, last_ab_data
     result_var.set("") # תמיד לאפס קודם ולרוקן את הכיתוב הישן
     if not last_positive_snp_string:
@@ -634,8 +643,23 @@ def run_calculate_clade():
             return
         
         # האחרון הוא בעל הציון הכי גבוה ולכן בדרך כלל הכי נכון
-        Final_clade = clades[0]
-         
+        Final_clade = clades[Final_clade_index]
+        
+        ############################################################
+        ################ עדיין לא מטופל מקרה כמו אבא לוי מייהירטייג שבו יש ווריאנט שגוי במקס סקור שהוא לא צאצא של הווריאנט הבא אחריו בסקור
+        #####@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@!!!!!!!!!!!!!
+        if len(clades) >= 2:
+            next_Final_clade = clades[Final_clade_index + 1] # or clades[1]
+            clade_snp = get_snp_from_clade(next_Final_clade.name)
+            next_Final_clade_descendants = get_clade_and_descendants_lists(yfull_tree_data, clade_snp)
+            if Final_clade.name not in next_Final_clade_descendants:
+                messagebox.showerror("next_Final_clade_descendants_Error", "next_Final_clade_descendants_Error")
+                next_Final_clade_descendants_Error = "next_Final_clade_descendants_Error"
+                yclade_label.config(text=next_Final_clade_descendants_Error, fg="red")
+                
+        
+        ########################################################
+        
         # קבלת מידע על קבוצת אבותינו שהענף נמצא בה או שהיא נמצאת תחת הענף באמצעות פונקציה
         ab_string = get_ab_from_clade(Final_clade.name)
         
@@ -659,6 +683,19 @@ def run_calculate_clade():
             
         #ref_result_label.config(fg="green", bg="SystemButtonFace")
         
+        def split_ab_string(ab_string: str, per_line: int = 5) -> str:
+            """
+            מקבל מחרוזת ארוכה עם ערכים מופרדים בפסיקים
+            ומחזיר מחרוזת מפוצלת לשורות, כך שכל שורה מכילה per_line ערכים.
+            """
+            items = [x.strip() for x in ab_string.split(",") if x.strip()]
+            lines = []
+            for i in range(0, len(items), per_line):
+                lines.append(", ".join(items[i:i+per_line]))
+            return "\n".join(lines)
+
+        # פיצול רשימת ה AB לפי 5 לשורה באמצעות הפונקצייה הנל    
+        ab_string_multiline = split_ab_string(ab_string, per_line=5)
         
         # הצגת התוצאה במסך
         result_var.set(
@@ -667,7 +704,7 @@ def run_calculate_clade():
             f" Name:    {name}\n"
             f" TMRCA:   {tmrca} ybp\n"
             f" FORMED:  {formed} ybp\n"
-            f"{ab_string}\n"
+            f"{ab_string_multiline}\n"
             f"yfull tree version. {yfull_tree_data.version}"
         )
 
@@ -678,10 +715,19 @@ def run_calculate_clade():
          
         yclade_label.config(text="Analysis finished successfully.", fg="blue")
         
-        if len(clades) >= 2 and clades[0].score == clades[1].score:
+        # במקרה שיש יותר מענף אחד בציון הכי גבוה נותנת אופצייה להתקדם למיקום הבא ברשימת התוצאות
+        if len(clades) >= 2 and clades[Final_clade_index].score == clades[(Final_clade_index+1)].score:
             yclade_label.config(text=more_result_warning, fg="red")
+            if messagebox.askyesno("Warning", "There is more than one top-scoring clade.\nDo you want to see the next one?"):
+                return run_calculate_clade(Final_clade_index = (Final_clade_index+1) % len(clades))
+        '''
+        # זו צורה נוספת שבודקת רק את המיקום האחרון והבא אחריו, וההודעה קובץ כל פעם מהמיקום האחרון לזה שאחריו וחוזר חלילה    
+        if len(clades) >= 2 and clades[0].score == clades[(1)].score:
+            yclade_label.config(text=more_result_warning, fg="red")
+            if messagebox.askyesno("Warning", "There is more than one top-scoring clade.\nDo you want to see the next one?"):
+                return run_calculate_clade(Final_clade_index = 1)
+        '''
         
-
     except Exception as e:
         messagebox.showerror("Error", str(e))
         
