@@ -770,7 +770,7 @@ def run_calculate_clade(Final_clade_index = 0):
         
         # הצגת התוצאה במסך
         result_var.set(
-            f"ref_in_dna_file:     {last_dna_file_type}\n"
+            f"run for:     {'User DNA-file' if user_loaded else 'check Y-SNP button'}\n"
             f"YFull predicted clade (used ref {last_ref_type}):\n"
             f" Name:    {name}\n"
             f" TMRCA:   {tmrca} ybp\n"
