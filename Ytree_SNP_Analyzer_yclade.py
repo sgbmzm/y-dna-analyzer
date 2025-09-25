@@ -418,7 +418,7 @@ def load_dna_file():
         return
     
     dna_file_info = detect_headlines(file_path)
-    print("dna_file_info", dna_file_info)
+    
     # בדיקת או בחירת הרפרנס המתאים לקובץ הדנא של המשתמש
     ref_auto_detect = dna_file_info["ref"]
     
@@ -686,7 +686,7 @@ def get_ab_from_clade(clade: str, from_snp = False):    # הצהרה על משת
     
                
 def run_calculate_clade(Final_clade_index = 0):
-    global last_positive_snp_string, last_clades, last_reference_file, ref_user_file, last_dna_file_type, last_ref_type, last_ab_data
+    global last_positive_snp_string, last_clades, last_reference_file, ref_user_file, last_dna_file_type, last_ref_type, last_ab_data, last_dna_file_info
     result_var.set("") # תמיד לאפס קודם ולרוקן את הכיתוב הישן
     if not last_positive_snp_string:
         result_var.set("No matching SNPs were found in the file")
@@ -724,16 +724,11 @@ def run_calculate_clade(Final_clade_index = 0):
         Final_clade = clades[Final_clade_index]
         
         ############################################################
-        ################ עדיין לא מטופל מקרה כמו אבא לוי מייהירטייג שבו יש ווריאנט שגוי במקס סקור שהוא לא צאצא של הווריאנט הבא אחריו בסקור
-        #####@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@!!!!!!!!!!!!!
         # Z2125 במיקום גנומי 19: 6892233 בקבצים הגולמיים של מייהירטייג חיובי לכולם ולכן גורם לבעיה בעיקר אצל AB-067 וצריך לדלג עליו לגמרי
         # השורה הלא נכונה היא: rs570569843 Y 6892233 TT
         # Known SNPs at this position: Z2125 C  to  T
-        
-        if Final_clade.name == "R-Z2125" and "MyHeritage" in last_dna_file:
-            Final_clade = clades[Final_clade_index+1]
-            print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@2")      
-        
+        if Final_clade.name == "R-Z2125" and user_loaded and last_dna_file_info["creator"] == "myheritage":
+            Final_clade = clades[Final_clade_index+1]    
         ########################################################
         
         # קבלת מידע על קבוצת אבותינו שהענף נמצא בה או שהיא נמצאת תחת הענף באמצעות פונקציה
