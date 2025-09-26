@@ -605,7 +605,7 @@ def get_ab_data():
     if last_ab_data: #  אם כבר הנתונים נטענו אין צורך לטעון אותם שוב מהקובץ
         return
     
-    ab_groups_path = resource_path("ab_groups_snp.csv")  # כאן את שם הקובץ שלך
+    ab_groups_path = resource_path("ab_groups.csv")  # כאן את שם הקובץ שלך
     
     ab_data = []
     
@@ -618,19 +618,18 @@ def get_ab_data():
     # בדיקה האם קיימים נתונים על ענפי הצאצים של כל שורה ואם לא קיימים אז להוסיף אותם               
     for row in ab_data:
         
+        '''
         # זה רק אם רוצים שיהיה cneuo הזה ריק במקום 'None'
-        #if row['Final SNP'] in (None, '', 'None'):
-        #    row['Final SNP'] = ''
+        if row['Final SNP'] in (None, '', 'None'):
+            row['Final SNP'] = ''
+            
+        row['snp_verified'] = ""
+        '''
         
         # אם אין מפתח 'sub_clades', ניצור אותו ונמלא בו את הענפים של הצאצאים של הענף
         if 'sub_clades' not in row and row['Final SNP'] not in (None, '', 'None'):
             row['sub_clades'] = get_clade_and_descendants_lists(yfull_tree_data, row['Final SNP'])
-        else:
-            # בכל מקרה אחר העמודה קיימת ויש בה מידע שהוא מחרוזת כמו רשימה ואסט הופך את זה לרשימה
-            # אבל יש שורות ריקות כי אין להם ענף מגדיר ולכן אין להם תתי ענפים
-            if 'sub_clades' in row and row['sub_clades'] not in (None, '', 'None'):
-                row['sub_clades'] = ast.literal_eval(row['sub_clades'])
-        
+            
         # אם יש יותר מ 300 תתי ענפים זה אומר שזו טעות ותתי הענפים לא נכונים כי הקבוצה הוגדרה על ענף מידי גבוה
         #if len(row['sub_clades']) > 300:
         #    row['sub_clades'] = ""
@@ -647,15 +646,17 @@ def get_ab_data():
     last_ab_data = ab_data
     
     # האם לכתוב את הנתונים לקובץ. שימושי כדי לעשות קובץ עם תתי ענפים מעודכנים בקובץ
-    write = False
+    write = True
     
-    if write:
+    if write and messagebox.askyesno("Warning", "Do you want to write File?"):
         # כתיבה חזרה (דורכת על הקובץ המקורי)
-        fieldnames = list(ab_data[0].keys())  # שמות העמודות אחרי ההוספה
+        fieldnames = [k for k in ab_data[0].keys() if k != "sub_clades"] # שמות העמודות בלי עמודת תתי הקבוצות
         with open(ab_groups_path, 'w', newline='', encoding='utf-8') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames, delimiter=',')
             writer.writeheader()
-            writer.writerows(ab_data)
+            for row in ab_data:
+                row_to_write = {k: v for k, v in row.items() if k in fieldnames} # מסנן רק את העמודות שהוגדרו בכותרות
+                writer.writerow(row_to_write)
 
 
 # פונקצייה שמקבלת שם של ענף לדוגמא J2 או J-L243 ומחזירה את השם של הווריאנט שמגדיר אותו או את אחד מהם
@@ -1058,5 +1059,8 @@ user_result_label.grid(row=14, column=4)
 tk.Label(root, text="NOTE: Each reference has different positions").grid(row=15, column=2, padx=5, pady=5)
 
 root.mainloop()
+
+
+
 
 
