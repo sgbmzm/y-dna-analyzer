@@ -605,7 +605,7 @@ def get_ab_data():
     if last_ab_data: #  אם כבר הנתונים נטענו אין צורך לטעון אותם שוב מהקובץ
         return
     
-    ab_groups_path = resource_path("ab_groups.csv")  # כאן את שם הקובץ שלך
+    ab_groups_path = resource_path("ab_groups_snp.csv")  # כאן את שם הקובץ שלך
     
     ab_data = []
     
@@ -630,10 +630,19 @@ def get_ab_data():
             # אבל יש שורות ריקות כי אין להם ענף מגדיר ולכן אין להם תתי ענפים
             if 'sub_clades' in row and row['sub_clades'] not in (None, '', 'None'):
                 row['sub_clades'] = ast.literal_eval(row['sub_clades'])
+        
+        # אם יש יותר מ 300 תתי ענפים זה אומר שזו טעות ותתי הענפים לא נכונים כי הקבוצה הוגדרה על ענף מידי גבוה
+        #if len(row['sub_clades']) > 300:
+        #    row['sub_clades'] = ""
+        
+        # שדה לבדיקה האם בדקתי ואימתת את הענף המגדיר
+        # אחרי שאבדוק את כולם נעשה שרק ענפים שאימתתי יוכלו להיכנס לחשבון. בינתיים כולם נכנסים
+        #if "verified" not in row:        
+        #    row['snp_verified'] = "?"  
     
     # מיון לפי המספר שב־AB-Group
     ab_data.sort(key=lambda r: int(r["AB-Group"].split("-")[1]))
-       
+          
     # הגדרת המשתנה הגלובלי שיחזיק את כל המידע כדי שלא נטצרך לטעון כל פעם מחדש    
     last_ab_data = ab_data
     
