@@ -3,6 +3,7 @@ from tkinter import filedialog, messagebox, ttk
 import csv
 import os
 import re
+import ast
 import gzip
 import zipfile
 import io
@@ -605,7 +606,9 @@ def get_ab_data():
         return
     
     ab_groups_path = resource_path("ab_groups.csv")  # כאן את שם הקובץ שלך
+    
     ab_data = []
+    
     # טעינת כל שורה בקובץ לתוך מילון
     with open(ab_groups_path, newline='', encoding='utf-8') as csvfile:
         reader = csv.DictReader(csvfile, delimiter=',')  # אם הקובץ מופרד בפסיקים  
@@ -614,15 +617,29 @@ def get_ab_data():
             ab_data.append(row)
     # בדיקה האם קיימים נתונים על ענפי הצאצים של כל שורה ואם לא קיימים אז להוסיף אותם               
     for row in ab_data:
-        # אם אין מפתח 'sub_clades', ניצור אותו עם הערך "052"
+        
+        # זה רק אם רוצים שיהיה cneuo הזה ריק במקום 'None'
+        #if row['Final SNP'] in (None, '', 'None'):
+        #    row['Final SNP'] = ''
+        
+        # אם אין מפתח 'sub_clades', ניצור אותו ונמלא בו את הענפים של הצאצאים של הענף
         if 'sub_clades' not in row and row['Final SNP'] not in (None, '', 'None'):
             row['sub_clades'] = get_clade_and_descendants_lists(yfull_tree_data, row['Final SNP'])
+        else:
+            # בכל מקרה אחר העמודה קיימת ויש בה מידע שהוא מחרוזת כמו רשימה ואסט הופך את זה לרשימה
+            # אבל יש שורות ריקות כי אין להם ענף מגדיר ולכן אין להם תתי ענפים
+            if 'sub_clades' in row and row['sub_clades'] not in (None, '', 'None'):
+                row['sub_clades'] = ast.literal_eval(row['sub_clades'])
     
+    # מיון לפי המספר שב־AB-Group
+    ab_data.sort(key=lambda r: int(r["AB-Group"].split("-")[1]))
+       
+    # הגדרת המשתנה הגלובלי שיחזיק את כל המידע כדי שלא נטצרך לטעון כל פעם מחדש    
     last_ab_data = ab_data
     
+    # האם לכתוב את הנתונים לקובץ. שימושי כדי לעשות קובץ עם תתי ענפים מעודכנים בקובץ
     write = False
-    '''
-    # זה כרגע לא טוב כי זה מפריע לקריאה של השדה row['sub_clades'] ###= ast.literal_eval(row['sub_clades']) 
+    
     if write:
         # כתיבה חזרה (דורכת על הקובץ המקורי)
         fieldnames = list(ab_data[0].keys())  # שמות העמודות אחרי ההוספה
@@ -630,7 +647,6 @@ def get_ab_data():
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames, delimiter=',')
             writer.writeheader()
             writer.writerows(ab_data)
-    '''
 
 
 # פונקצייה שמקבלת שם של ענף לדוגמא J2 או J-L243 ומחזירה את השם של הווריאנט שמגדיר אותו או את אחד מהם
@@ -686,6 +702,10 @@ def get_ab_from_clade(clade: str, from_snp = False):    # הצהרה על משת
     
                
 def run_calculate_clade(Final_clade_index = 0):
+    
+    # דבר ראשון קוראים לפונקצייה שמקימה את מערך המידע על קבוצות אבותינו
+    get_ab_data()
+    
     global last_positive_snp_string, last_clades, last_reference_file, ref_user_file, last_dna_file_type, last_ref_type, last_ab_data, last_dna_file_info
     result_var.set("") # תמיד לאפס קודם ולרוקן את הכיתוב הישן
     if not last_positive_snp_string:
@@ -1018,9 +1038,6 @@ user_result_label = tk.Label(root, textvariable=user_result_var, fg="green")
 user_result_label.grid(row=14, column=4)
 
 tk.Label(root, text="NOTE: Each reference has different positions").grid(row=15, column=2, padx=5, pady=5)
-
-get_ab_data()
-
 
 root.mainloop()
 
