@@ -689,7 +689,16 @@ def get_ab_from_clade(clade: str, from_snp = False):    # הצהרה על משת
     for row in last_ab_data:
         ab_clades_list = row.get('sub_clades', [])
         ab_clades_clean = [s.replace("*", "") for s in ab_clades_list]  # מסירים כוכביות
-
+        
+        #####################################################################
+        # לדלג על שורות לא הגיוניות של ענפים שיש להם יותר מ 400 תתי ענפים וזה אומר שהם הוגדרו בטעות על ענף מידי גבוה ולא על האמיתי 
+        # בעתיד אחרי שכל ענף יאומת לפי סניפ מדוייק נצטרך להוריד את הבדיקה הזו
+        len_clades = len(ab_clades_list)
+        if len_clades > 400:
+            print(f"{row['AB-Group']} >400 sub_clades ({len_clades}) ")
+            continue
+        #####################################################################
+        
         # בדיקה האם הענף המבוקש נמצא בתוך אחת מקבוצות אבותינו
         if clade in ab_clades_clean:
             clade_found_ab = True
