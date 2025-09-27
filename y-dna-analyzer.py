@@ -517,7 +517,7 @@ def load_dna_file():
     # בדיקת או בחירת הרפרנס המתאים לקובץ הדנא של המשתמש
     ref_auto_detect = dna_file_info["ref"]
     
-    if ref_var.get() == "Aautodetect":
+    if ref_var.get() == "Aautodetect": 
         ref_path = "Msnps_hg19.vcf.gz" if ref_auto_detect == "hg19" else "snps_hg38.vcf.gz" if ref_auto_detect == "hg38" else "ask"
     
         if not ref_auto_detect:
@@ -694,17 +694,15 @@ def load_dna_file():
 # פונקציה שטוענת מקובץ את הנתונים על קבוצות אבותינו וענפי הצאצאים שלהם ויכולה גם לשמור לקובץ
 def get_ab_data():
     
-    global last_ab_data, yfull_tree_data
+    global last_ab_data, yfull_tree_data, ab_groups_snp_path
     
     if last_ab_data: #  אם כבר הנתונים נטענו אין צורך לטעון אותם שוב מהקובץ
         return
     
-    ab_groups_path = resource_path("ab_groups_snp.csv")  # כאן את שם הקובץ שלך
-    
     ab_data = []
     
     # טעינת כל שורה בקובץ לתוך מילון
-    with open(ab_groups_path, newline='', encoding='utf-8') as csvfile:
+    with open(ab_groups_snp_path, newline='', encoding='utf-8') as csvfile:
         reader = csv.DictReader(csvfile, delimiter=',')  # אם הקובץ מופרד בפסיקים  
         for row in reader:
             # כל שורה היא מילון עם שמות העמודות כמפתחות
@@ -736,7 +734,7 @@ def get_ab_data():
         # כתיבה חזרה (דורכת על הקובץ המקורי)
         fieldnames = [k for k in ab_data[0].keys() if k != "sub_clades"] # שמות העמודות בלי עמודת תתי הקבוצות
         #fieldnames = [k for k in ab_data[0].keys()] # כל העמודות
-        with open(ab_groups_path, 'w', newline='', encoding='utf-8') as csvfile:
+        with open(ab_groups_snp_path, 'w', newline='', encoding='utf-8') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames, delimiter=',')
             writer.writeheader()
             for row in ab_data:
