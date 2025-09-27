@@ -1,6 +1,6 @@
 The code is for personal use only - not for profit
 
-**MAIN-CODE_FILE = Ytree_SNP_Analyzer_yclade.py**
+**MAIN-CODE_FILE = y-dna-analyzer.py**
 
 This code is still a work in progress, and I expect to update it from time to time.
 
