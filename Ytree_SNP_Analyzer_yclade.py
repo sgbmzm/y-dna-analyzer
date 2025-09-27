@@ -605,7 +605,7 @@ def get_ab_data():
     if last_ab_data: #  אם כבר הנתונים נטענו אין צורך לטעון אותם שוב מהקובץ
         return
     
-    ab_groups_path = resource_path("ab_groups.csv")  # כאן את שם הקובץ שלך
+    ab_groups_path = resource_path("ab_groups_snp.csv")  # כאן את שם הקובץ שלך
     
     ab_data = []
     
@@ -615,30 +615,21 @@ def get_ab_data():
         for row in reader:
             # כל שורה היא מילון עם שמות העמודות כמפתחות
             ab_data.append(row)
-    # בדיקה האם קיימים נתונים על ענפי הצאצים של כל שורה ואם לא קיימים אז להוסיף אותם               
-    for row in ab_data:
-        
-        '''
-        # זה רק אם רוצים שיהיה cneuo הזה ריק במקום 'None'
-        if row['Final SNP'] in (None, '', 'None'):
-            row['Final SNP'] = ''
-            
-        row['snp_verified'] = ""
-        '''
-        
-        # אם אין מפתח 'sub_clades', ניצור אותו ונמלא בו את הענפים של הצאצאים של הענף
-        if 'sub_clades' not in row and row['Final SNP'] not in (None, '', 'None'):
-            row['sub_clades'] = get_clade_and_descendants_lists(yfull_tree_data, row['Final SNP'])
-            
-        # אם יש יותר מ 300 תתי ענפים זה אומר שזו טעות ותתי הענפים לא נכונים כי הקבוצה הוגדרה על ענף מידי גבוה
-        #if len(row['sub_clades']) > 300:
-        #    row['sub_clades'] = ""
-        
-        # שדה לבדיקה האם בדקתי ואימתת את הענף המגדיר
-        # אחרי שאבדוק את כולם נעשה שרק ענפים שאימתתי יוכלו להיכנס לחשבון. בינתיים כולם נכנסים
-        #if "verified" not in row:        
-        #    row['snp_verified'] = "?"  
     
+    # מעבר על כל השורות והוספת נתונים על תתי הענפים של כל ענף במידה וידוע ה- SNP המגדיר               
+    # תמיד בודקים מחדש מהם תתי הענפים כי לפעמים יש עדכונים בעץ שמשפיעים על תתי הענפים
+    for row in ab_data:     
+        if row['Final SNP'] not in (None, '', 'None'): # בהמשך אולי להוסיף and row['snp_verified'] not in (None, '', 'None')
+            row['sub_clades'] = get_clade_and_descendants_lists(yfull_tree_data, row['Final SNP'])
+        
+        '''
+        # אם משתמשים בקובץ שיש בו מידע על תתי הענפים ורוצים להשתמש בהם במקום לחשב מחדש
+        # לא טוב להשתמש בזה אז זה מבוטל ונמצא רק לשמירה
+        # עדיף להשתמש באפשרות הקודמת ולבדוק כל פעם מחדש מהם תתי הענפים כי לפעמים יש עדכונים בעץ
+        if 'sub_clades' in row and row['sub_clades'] not in (None, '', 'None'):
+            row['sub_clades'] = ast.literal_eval(row['sub_clades'])
+        '''
+        
     # מיון לפי המספר שב־AB-Group
     ab_data.sort(key=lambda r: int(r["AB-Group"].split("-")[1]))
           
@@ -646,11 +637,11 @@ def get_ab_data():
     last_ab_data = ab_data
     
     # האם לכתוב את הנתונים לקובץ. שימושי כדי לעשות קובץ עם תתי ענפים מעודכנים בקובץ
-    write = True
-    
+    write = False
     if write and messagebox.askyesno("Warning", "Do you want to write File?"):
         # כתיבה חזרה (דורכת על הקובץ המקורי)
         fieldnames = [k for k in ab_data[0].keys() if k != "sub_clades"] # שמות העמודות בלי עמודת תתי הקבוצות
+        #fieldnames = [k for k in ab_data[0].keys()] # כל העמודות
         with open(ab_groups_path, 'w', newline='', encoding='utf-8') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames, delimiter=',')
             writer.writeheader()
@@ -1059,8 +1050,5 @@ user_result_label.grid(row=14, column=4)
 tk.Label(root, text="NOTE: Each reference has different positions").grid(row=15, column=2, padx=5, pady=5)
 
 root.mainloop()
-
-
-
 
 
