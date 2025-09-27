@@ -8,12 +8,39 @@ import gzip
 import zipfile
 import io
 import webbrowser
+from urllib.request import urlopen
+from urllib.request import urlretrieve
+import json
 import yclade
 from yclade import tree, snps, find
 import networkx as nx
 
 # טעינת עץ ווייפול
 yfull_tree_data = tree.get_yfull_tree_data(version=None, data_dir=None)
+
+
+def get_latest_yfull_tree_version() -> str:
+    """
+    מחזיר את מספר הגרסה האחרונה של YTree מגיטהאב.
+    """
+    url = "https://api.github.com/repos/YFullTeam/YTree/contents/ytree"
+    with urlopen(url) as resp:
+        data = json.load(resp)
+
+    versions = []
+    for item in data:
+        name = item.get("name", "")
+        m = re.match(r"tree_(\d+\.\d+\.\d+)\.zip", name)
+        if m:
+            versions.append(m.group(1))
+
+    if not versions:
+        raise RuntimeError("No current version found")
+
+    # ממיין לפי מספרי גרסה (למשל 13.04.0)
+    versions.sort(key=lambda v: tuple(map(int, v.split("."))))
+    # מחזיר את האחרון שזה הגרסה הכי עדכנית
+    return versions[-1]
 
 
 # ------------------------
@@ -971,7 +998,7 @@ root = tk.Tk()
 # קביעת מינימום גודל
 #root.minsize(500, 500)
 
-root.title("Y_Tree SNP Analyzer | by Dr. simcha-gershon Bohrer (Phd.) | versin: 26 sep 2025")
+root.title("y-dna-analyzer | by Dr. simcha-gershon Bohrer (PhD.) | versin: 28 sep 2025")
 
 # מפריד אנכי
 ttk.Separator(root, orient="vertical").grid(row=0, column=1, sticky="ns", padx=5, rowspan=20)
