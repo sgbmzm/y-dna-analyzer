@@ -9,38 +9,117 @@ import zipfile
 import io
 import webbrowser
 from urllib.request import urlopen
-from urllib.request import urlretrieve
+#from urllib.request import urlretrieve
+from pathlib import Path
 import json
 import yclade
-from yclade import tree, snps, find
+from yclade import tree, snps, find, const
 import networkx as nx
 
 # טעינת עץ ווייפול
 yfull_tree_data = tree.get_yfull_tree_data(version=None, data_dir=None)
 
+# פונקצייה לקבל מיקום מוחלט של קובץ שאמור להיות כלול בתוכנה
+# ראו: https://stackoverflow.com/questions/7674790/bundling-data-files-with-pyinstaller-onefile/44352931#44352931
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
 
+    return os.path.join(base_path, relative_path)
+
+
+# כתובת עבור תיקיית הקבצים לצורך קבצים משתנים של התוכנה 
+#yda_dir_path = fr"{os.environ.get('HOMEDRIVE')}{os.environ.get('HOMEPATH')}\AppData\Roaming\y_dna_analyzer"
+yda_dir_path = os.path.expanduser("~\AppData\Roaming\y_dna_analyzer")
+
+# במידה ולא קיימת תיקיית הקבצים של התוכנה, יצירת תיקייה עבור קבצים משתנים של התוכנה בתוך אפפדאטא-רומינג
+if not os.path.exists(yda_dir_path):
+    os.mkdir(yda_dir_path)
+    
+# הגדרת הכתובת עבור קובץ קבוצות אבותינו 
+ab_groups_snp_path = yda_dir_path+'\ab_groups_snp.csv' 
+# אם אין קובץ בשם "מיקומים-ערוך" בתיקיית התוכנה באפפ-דאטה, אז יש לקבל מיקום מוחלט של קובץ המיקומים הדיפולטי שנמצא בתיקיית ההתקנה
+if not os.path.exists(ab_groups_snp_path):
+    ab_groups_snp_path = resource_path("ab_groups_snp.csv")  # כאן את שם הקובץ שלך
+    
+snps_hg38_path = yda_dir_path+'\snps_hg38.vcf.gz'
+if not os.path.exists(ab_groups_snp_path):
+    snps_hg38_path = resource_path("snps_hg38.vcf.gz")  # כאן את שם הקובץ שלך
+    
+Msnps_hg19_path = resource_path("Msnps_hg19.vcf.gz")
+
+yfull_tree_dir = yda_dir_path
+
+
+
+# פונקצייה שמחזירה את מספר הגרסה העדכנית ביותר של עץ וויפול
 def get_latest_yfull_tree_version() -> str:
-    """
-    מחזיר את מספר הגרסה האחרונה של YTree מגיטהאב.
-    """
-    url = "https://api.github.com/repos/YFullTeam/YTree/contents/ytree"
+    url = "https://raw.githubusercontent.com/YFullTeam/YTree/master/current_version.txt"
     with urlopen(url) as resp:
-        data = json.load(resp)
+        return resp.read().decode("utf-8").strip()
+    
+# פונקצייה לעדכון שלושת הקבצים החשובים שעליהם מסתמכת התוכנה
+def update_basic_files(root):
+    """
+    מוריד שלושת הקבצים עם התקדמות הורדה, בלי להשתמש ב-Frame.
+    """
+    # שאלה למשתמש
+    proceed = messagebox.askyesno(
+        "Download Files",
+        "Are you sure you want to download the three files?"
+    )
+    if not proceed:
+        messagebox.showinfo("Download canceled", "The download was canceled.")
+        return
 
-    versions = []
-    for item in data:
-        name = item.get("name", "")
-        m = re.match(r"tree_(\d+\.\d+\.\d+)\.zip", name)
-        if m:
-            versions.append(m.group(1))
+    # תיקיית שמירה
+    yda_dir_path = os.path.expanduser(r"~\AppData\Roaming\y_dna_analyzer")
+    save_dir = Path(yda_dir_path)
+    save_dir.mkdir(parents=True, exist_ok=True)
 
-    if not versions:
-        raise RuntimeError("No current version found")
+    # רשימת קבצים להורדה
+    files_to_download = [
+        ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/ab_groups_snp.csv", "ab_groups_snp.csv"),
+        ("https://ybrowse.org/gbrowse2/gff/snps_hg38.vcf.gz", "snps_hg38.vcf.gz")
+    ]
 
-    # ממיין לפי מספרי גרסה (למשל 13.04.0)
-    versions.sort(key=lambda v: tuple(map(int, v.split("."))))
-    # מחזיר את האחרון שזה הגרסה הכי עדכנית
-    return versions[-1]
+    # גרסת עץ YFull עדכנית
+    version_url = "https://raw.githubusercontent.com/YFullTeam/YTree/master/current_version.txt"
+    with urlopen(version_url) as resp:
+        version = resp.read().decode("utf-8").strip()
+    yfull_tree_url = f"https://github.com/YFullTeam/YTree/raw/refs/heads/master/ytree/tree_{version}.zip"
+    files_to_download.append((yfull_tree_url, f"tree_{version}.zip"))
+
+    # יצירת progress bar ישירות ב-root
+    progress_bar = ttk.Progressbar(root, length=200, maximum=len(files_to_download))
+    progress_bar.grid(row=12, column=4, padx=5, pady=5)
+    root.update()
+
+    # הורדה ושמירה
+    failed_files = []
+    for i, (url, filename) in enumerate(files_to_download, start=1):
+        save_path = save_dir / filename
+        try:
+            with urlopen(url) as response, open(save_path, "wb") as out_file:
+                out_file.write(response.read())
+        except Exception as e:
+            failed_files.append(f"{filename} ({e})")
+        progress_bar['value'] = i
+        root.update()
+
+    # הודעה על הצלחה/כשל
+    if not failed_files:
+        messagebox.showinfo("Download Complete", "All files were downloaded successfully.")
+    else:
+        messagebox.showerror("Download Failed", f"Failed to download:\n" + "\n".join(failed_files))
+        
+    # הסרת ה-progress bar מהחלון
+    progress_bar.destroy()
+
 
 
 # ------------------------
@@ -62,18 +141,6 @@ last_ftdna_link = ""
 last_ab_data = None
 last_dna_file_info = ""
 
-
-# פונקצייה לקבל מיקום מוחלט של קובץ שאמור להיות כלול בתוכנה
-# ראו: https://stackoverflow.com/questions/7674790/bundling-data-files-with-pyinstaller-onefile/44352931#44352931
-def resource_path(relative_path):
-    """ Get absolute path to resource, works for dev and for PyInstaller """
-    try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-
-    return os.path.join(base_path, relative_path)
 
 # ------------------------
 # איפוס משתמש
@@ -1065,6 +1132,8 @@ entry_search.grid(row=13, column=2, padx=5, pady=5)
 # כפתור בדיקה בנתוני המשתמש
 btn_check = tk.Button(root, text="Check: SNP name / Genomic position", command=check_search_input) 
 btn_check.grid(row=14, column=2, padx=5, pady=5)
+
+tk.Button(root, text="Update Files", command=lambda: update_basic_files(root)).grid(row=12, column=4, padx=5, pady=5)
     
 ref_result_var = tk.StringVar()
 ref_result_label = tk.Label(root, textvariable=ref_result_var, fg="green")
