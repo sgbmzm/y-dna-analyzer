@@ -1,3 +1,4 @@
+# יבוא הספריות הדרושות לתוכנה
 import tkinter as tk
 from tkinter import *
 from tkinter import filedialog, messagebox, ttk
@@ -18,11 +19,71 @@ import yclade
 from yclade import tree, snps, find, const
 import networkx as nx
 
+##########################################################################
+# תוכן המידע על התוכנה
+INFORMATION = '''
+This software analyzes raw DNA files.
+Provides information on the Y chromosome only.
+More information to come later
+'''
+
+# פונקצייה להצגת המידע על התוכנה
+def show_information():
+    # יצירת חלון חדש מעל root
+    info_win = tk.Toplevel(root)
+    info_win.title("Information")
+    info_win.geometry("500x400")
+
+    # יצירת Frame פנימי שיחזיק את הטקסט וה־Scrollbar
+    frame = ttk.Frame(info_win)
+    frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+    # יצירת Scrollbar אנכי
+    scrollbar = ttk.Scrollbar(frame, orient="vertical")
+    scrollbar.pack(side="right", fill="y")
+
+    # תיבת טקסט לקריאה בלבד
+    text_box = tk.Text(frame, wrap="word", height=20, width=60, yscrollcommand=scrollbar.set)
+    text_box.pack(side="left", fill="both", expand=True)
+
+    # חיבור ה־Scrollbar לתיבה
+    scrollbar.config(command=text_box.yview)
+
+    # הוספת המידע
+    text_box.insert("1.0", INFORMATION)
+
+    # נעילת התיבה לעריכה, עדיין מאפשרת העתקה
+    text_box.config(state="disabled")
+
+
+#####################################################################################
+
 # משתנה מאוד חשוב שקובע האם מערכת ההפעלה הנוכחית היא ווינדוס כי אם היא לא אז אי אפשר לעשות חלק מהפעולות
 is_windows = platform.system() == "Windows"
 
+# כתובת עבור תיקיית הקבצים לצורך קבצים משתנים של התוכנה 
+#yda_dir_path = fr"{os.environ.get('HOMEDRIVE')}{os.environ.get('HOMEPATH')}\AppData\Roaming\y_dna_analyzer"
+if is_windows:
+    yda_dir_path = os.path.expanduser(r"~\AppData\Roaming\y_dna_analyzer")
+else:
+    yda_dir_path = os.path.expanduser("~/y_dna_analyzer")
+
+# במידה ולא קיימת תיקיית הקבצים של התוכנה, יצירת תיקייה עבור קבצים משתנים של התוכנה
+if not os.path.exists(yda_dir_path):
+    os.mkdir(yda_dir_path)
+
+#######################################################################################################
 # טעינת עץ ווייפול
 yfull_tree_data = tree.get_yfull_tree_data(version=None, data_dir=None)
+yfull_tree_dir = yda_dir_path
+
+# פונקצייה שמחזירה את מספר הגרסה העדכנית ביותר של עץ וויפול
+def get_latest_yfull_tree_version() -> str:
+    url = "https://raw.githubusercontent.com/YFullTeam/YTree/master/current_version.txt"
+    with urlopen(url) as resp:
+        return resp.read().decode("utf-8").strip()
+    
+######################################################################################################
 
 # פונקצייה לקבל מיקום מוחלט של קובץ שאמור להיות כלול בתוכנה
 # ראו: https://stackoverflow.com/questions/7674790/bundling-data-files-with-pyinstaller-onefile/44352931#44352931
@@ -35,12 +96,9 @@ def resource_path(relative_path):
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
-# פונקצייה לעדכון ארבעת הקבצים החשובים שעליהם מסתמכת התוכנה
+# פונקצייה לעדכון הקבצים החשובים הדרושים לפעולת התוכנה
 def update_required_files():
-    """
-    מוריד הקבצים הדרושים לתוכנה.
-    """
-    # שאלה למשתמש
+    # שאלה למשתמש האם מעוניין להוריד את הקבצים
     proceed = messagebox.askyesno(
         "Download Files",
         "Are you sure you want to download/update required files?"
@@ -48,9 +106,9 @@ def update_required_files():
     if not proceed:
         messagebox.showinfo("Download canceled", "The download was canceled.")
         return
-
+    
     # תיקיית שמירה
-    yda_dir_path = os.path.expanduser(r"~\AppData\Roaming\y_dna_analyzer")
+    global yda_dir_path
     save_dir = Path(yda_dir_path)
     save_dir.mkdir(parents=True, exist_ok=True)
 
@@ -61,13 +119,14 @@ def update_required_files():
         ("https://ybrowse.org/gbrowse2/gff/snps_hg38.vcf.gz", "snps_hg38.vcf.gz"),
     ]
 
-    # גרסת עץ YFull עדכנית
+    # גרסת עץ YFull הכי עדכנית והוספתה לרשימת ההורדות
     version_url = "https://raw.githubusercontent.com/YFullTeam/YTree/master/current_version.txt"
     with urlopen(version_url) as resp:
         version = resp.read().decode("utf-8").strip()
     yfull_tree_url = f"https://github.com/YFullTeam/YTree/raw/refs/heads/master/ytree/tree_{version}.zip"
     files_to_download.append((yfull_tree_url, f"tree_{version}.zip"))
     
+    # ממשג גרפי להצגת התקדמות ההורדה
     jroot = Tk()
     jroot.title("update_required_files")
     jroot.attributes("-topmost", True) # מבטיח שהחלון יהיה מעל כל האחרים
@@ -87,31 +146,16 @@ def update_required_files():
         progress_bar['value'] = i
         jroot.update()
 
-    # הסרת החלון
+    # הסרת החלון לאחר סיום ההורדה
     jroot.destroy()
 
-    # הודעה על הצלחה/כשל
+    # הודעה על הצלחה/כשל והחזרת טרו במקרה של ל הצלחה ופאלס במקרה של כשלון
     if not failed_files:
         messagebox.showinfo("Download Complete", "All files were downloaded successfully.")
         return True
     else:
         messagebox.showerror("Download Failed", f"Failed to download:\n" + "\n".join(failed_files))
         return False
-        
-
-# כתובת עבור תיקיית הקבצים לצורך קבצים משתנים של התוכנה 
-#yda_dir_path = fr"{os.environ.get('HOMEDRIVE')}{os.environ.get('HOMEPATH')}\AppData\Roaming\y_dna_analyzer"
-if is_windows:
-    yda_dir_path = os.path.expanduser(r"~\AppData\Roaming\y_dna_analyzer")
-else:
-    yda_dir_path = os.path.expanduser("~/y_dna_analyzer")
-
-# במידה ולא קיימת תיקיית הקבצים של התוכנה, יצירת תיקייה עבור קבצים משתנים של התוכנה בתוך אפפדאטא-רומינג
-if not os.path.exists(yda_dir_path):
-    os.mkdir(yda_dir_path)
-    
-
-yfull_tree_dir = yda_dir_path
     
 # משתנה גלובלי מאוד חשוב ששומר את המידע האם הקבצים הדרושים לתוכנה קיימים
 is_required_files_exist = False
@@ -142,36 +186,26 @@ else:
     # אם אפילו אחד מהם לא נמצא אז מנסים לעדכן את הקבצים ולהוריד אותם מהאינטרנט
     # אם לא מצליחים אז יודעים שאין לתוכנה את הקבצים הדרושים
     else:
-        if update_required_files():  
+        if update_required_files():  # קוראים לפונקציית הורדת הקבצים ואם היא מצליחה היא מחזירה טרו ואז הקבצים בתיקייה הייעודית להם
             ab_groups_snp_path = yda_dir_path+'\ab_groups_snp.csv' 
             snps_hg38_path = yda_dir_path+'\snps_hg38.vcf.gz'
             Msnps_hg19_path = yda_dir_path+'\Msnps_hg19.vcf.gz'
             is_required_files_exist = True
         else:
-            ab_groups_snp_path = ""
-            snps_hg38_path = ""
-            Msnps_hg19_path = ""
+            ab_groups_snp_path = None
+            snps_hg38_path = None
+            Msnps_hg19_path = None
             is_required_files_exist = False
 
 # הודעה למשתמש אם הקבצים הדרושים חסרים        
 if not is_required_files_exist:
     messagebox.showerror("Required files are missing", f"Required files are missing. Please connect to the internet and download them in the menu")
    
-
-# פונקצייה שמחזירה את מספר הגרסה העדכנית ביותר של עץ וויפול
-def get_latest_yfull_tree_version() -> str:
-    url = "https://raw.githubusercontent.com/YFullTeam/YTree/master/current_version.txt"
-    with urlopen(url) as resp:
-        return resp.read().decode("utf-8").strip()
-    
-
-
-# ------------------------
-# משתנים גלובליים
-# ------------------------
-last_clades = []
-last_positive_snp_string = ""
-last_ref_type = ""
+##########################################################################################################
+# משתנים גלובליים עבור התוכנה
+last_clades = [] # שומר את רשימת התוצאות שיוצאת מפונקציית run_calculate_clade לצורך שימוש עתידי
+last_positive_snp_string = "" # שומר את רשימת הווריאנטים החיוביים שבהם משתמשים לחישוב הקלייד ב run_calculate_clade
+last_ref_type = "" 
 reference_snps = {}      # pos -> ref_snp_name + ref_allele
 reference_names = {}      # id_snp_name -> pos
 user_snaps = {}          # pos -> ref_snp_name + ref_allele
@@ -184,19 +218,15 @@ last_yfull_link = ""
 last_ftdna_link = ""
 last_ab_data = None
 last_dna_file_info = ""
+########################################################################################################
 
-
-# ------------------------
-# איפוס משתמש
-# ------------------------
+# פונקצייה לביטול טעינת קובץ הדנא של המשתמש וכל הנתונים שחושבו עליו
 def reset_user():
-    global last_clades, last_positive_snp_string, last_dna_file, user_loaded 
-    
+    global last_clades, last_positive_snp_string, last_dna_file, user_loaded    
     last_clades = []
     last_positive_snp_string = ""
     last_dna_file = ""
     user_loaded = False
-
     result_var.set("")
     btn_yfull.grid_forget()
     btn_ftdna.grid_forget()
@@ -210,49 +240,27 @@ def reset_user():
     last_dna_file_info = ""
     last_yfull_link = ""
     last_ftdna_link = ""
+    
 
-    
-    
-'''
-# זה לא עבד טוב וזה לשמירה בלבד
-הפוקצייה הבאה ברוך השם עובדת
-# פונקצייה מאוד חשובה שמחזירה את שמות כל ענפי הצאצאים שתחת ענף מסויים בוויפול
-def get_branch_and_descendants(snp_name: str, include_descendants: bool = True):
-    """מחזיר רשימת ענפים לפי SNP, כולל צאצאים אם include_descendants=True.
-       יוצר את tree_data בתוך הפונקציה.
-    """
-    # טען את העץ
-    tree_data = tree.get_yfull_tree_data(version=None, data_dir=None)
-    
-    snp_name = snps.SnpResults(positive={snp_name.rstrip("+-")}, negative=set())
-    
-    snp_name = snps.normalize_snp_results(snp_results=snp_name,snp_aliases=tree_data.snp_aliases)
+# פונקצייה לביטול טעינת קובץ הרפרנס    
+def unload_ref():
+    global reference_snps, reference_names, last_reference_file, reference_loaded
+    reference_snps = {}      # pos -> ref_snp_name + ref_allele
+    reference_names = {}      # id_snp_name -> pos
+    last_reference_file = ""
+    reference_loaded = False
+    reference_loading_label.config(text="No reference_file loaded", fg="red")
+    btn_unload_ref.grid_forget()
+    ref_result_var.set("")
+    ref_result_label.config(text="", bg="SystemButtonFace")
+    reset_user() # מוסיפים ביטול של טעינת קובץ המשתמש כי בלי רפרנס אי אפשר להציג נתוני משתמש
 
-    # מציאת הצומת לפי ה-SNP
-    node = next(
-        (n for n, snps_set in tree_data.clade_snps.items() if snp_name.rstrip("+-") in snps_set),
-        None
-    )
-    if node is None:
-        raise ValueError(f"לא נמצא צומת מתאים ל-{snp_name}")
-
-    # קביעת הצמתים לכלול
-    nodes = [node] + list(nx.descendants(tree_data.graph, node)) if include_descendants else [node]
-
-    # מיון מהשורש לעלים
-    nodes_sorted = sorted(nodes, key=lambda n: len(list(nx.ancestors(tree_data.graph, n))))
-    
-    # זה לשימוש עתידי אם רוצים שיאסוף גם את רשימת כל הווריאנטים שתחת ענף מסויים
-    #snps_list = [tree_data.clade_snps.get(n, set()) for n in nodes_sorted]
-    
-    return nodes_sorted
-'''
 
 # פונקצייה מאוד חשובה שמחזירה את שמות כל ענפי הצאצאים שתחת ענף מסויים בוויפול
 def get_clade_and_descendants_lists(tree_data, snp_name: str, include_descendants: bool = True, merge_snps: bool = False):
     
     """מחזיר שתי רשימות מקבילות:
-       - כל שמות הקליידים (או רק הענף עצמו)
+       - כל שמות תתי הענפים (או רק הענף עצמו)
        - כל ה-SNPים של אותם קליידים (או רשימה אחת מאוחדת אם merge_snps=True)
        בסדר מהשורש לעלים.
        
@@ -304,9 +312,6 @@ def get_clade_and_descendants_lists(tree_data, snp_name: str, include_descendant
     return branch_names#, snps_list
 
 
-
-    
-
 # פונקצייה לפתיחת קבצים שונים כל קובץ לפי סוג הפתיחה הדרוש
 def universal_opener(file_path, only_dna_if_zip=False):
     # אם זה קובץ דחוס בשיטת gz
@@ -319,7 +324,7 @@ def universal_opener(file_path, only_dna_if_zip=False):
         # מניחים שמעוניינים דווקא בקובץ הראשון שיש בזיפ
         first_file_in_zip = zf.namelist()[0]    
         ####################################################
-        # בדיקה אם רוצים דווקא קובץ מייהירטייג
+        # בדיקה אם רוצים דווקא קובץ זיפ של מייהירטייג ולא שיבחרו סתם זיפ אחר
         if only_dna_if_zip:
             lower_file_name = first_file_in_zip.lower()
             # תנאי: שיהיה גם במחרוזת השם "myheritage" וגם שהסיומת תתאים לקובץ של מייהירטייג
@@ -367,52 +372,6 @@ def get_gz_internal_filename(filepath):
     except:
         return None
 
-##fileformat=MyHeritage
-##format=MHv1.0
-##chip=GSA
-##timestamp=2022-03-03 06:27:05 UTC
-##reference=build37
-# DOWNLOADED DATA WILL NO LONGER BE PROTECTED BY OUR SECURITY MEASURES.
-#RSID CHROMOSOME POSITION RESULT # אין סולמית במקור
-#rs547237130 1 72526 AA # אין סולמית במקור
-# כרומוזום Y נקרא בקובץ:   Y
-
-
-#AncestryDNA raw data download
-#This file was generated by AncestryDNA at: 01/23/2021 17:05:38 UTC
-#Data was collected using AncestryDNA array version: V2.0
-#Data is formatted using AncestryDNA converter version: V1.0
-#Below is a text version of your DNA file from Ancestry.com DNA, LLC.  THIS
-#Genetic data is provided below as five TAB delimited columns.  Each line 
-#corresponds to a SNP.  Column one provides the SNP identifier (rsID where 
-#possible).  Columns two and three contain the chromosome and basepair position 
-#of the SNP using human reference build 37.1 coordinates.  Columns four and five
-#rsid chromosome position allele1 allele2 # אין סולמית במקור
-#rs3131972 1 752721 G G # אין סולמית במקור
-# כרומוזום Y נקרא בקובץ:   24
-
-
-# This data file generated by 23andMe at: Fri Jul 31 00:41:13 2020
-# This file contains raw genotype data, including data that is not used in 23andMe reports.
-# This data has undergone a general quality review however only a subset of markers have been 
-# individually validated for accuracy. As such, this data is suitable only for research, 
-# educational, and informational use and not for medical or other use.
-# Below is a text version of your data.  Fields are TAB-separated
-# Each line corresponds to a single SNP.  For each SNP, we provide its identifier 
-# (an rsid or an internal id), its location on the reference human genome, and the 
-# genotype call oriented with respect to the plus strand on the human reference sequence.
-# We are using reference human assembly build 37 (also known as Annotation Release 104).
-# Note that it is possible that data downloaded at different times may be different due to ongoing 
-# improvements in our ability to call genotypes. More information about these changes can be found at:
-# https://you.23andme.com/p/24128f3ee36ceb87/tools/data/download/
-# More information on reference human assembly builds:
-# https://www.ncbi.nlm.nih.gov/assembly/GCF_000001405.13/
-# rsid chromosome position genotype # יש סולמית במקור
-#rs548049170 1 69869 TT # אין סולמית במקור
-# כרומוזום Y נקרא בקובץ:   Y
-
-# מייהירטייג: כתוב שם החברה, כתוב רפרנס 
-
 
 # פונקצייה לבדיקה האם כתוב בקובץ באיזה רפרנס הוא משתמש באיזה תאריך נוצר ומי היוצר
 def detect_headlines(file_path):
@@ -427,7 +386,7 @@ def detect_headlines(file_path):
         creator = "ftdna"
         creation_date = "unknown"
     
-    if is_gz_only(file_path): # אם זה קובץ שמסתיים רק ב gz ולא vcf.gz וכדומה
+    elif is_gz_only(file_path): # אם זה קובץ שמסתיים רק ב gz ולא vcf.gz וכדומה
         internal_name = get_gz_internal_filename(file_path) # מנסה למצוא האם יש שם לקובץ הפנימי שבתוך הדחיסה
         # אם יש שם ובתוך השם יש את המילה haplocaller סימן שזה קובץ y של ftdna ואני יודע שהוא hg38
         if internal_name and "haplocaller" in internal_name:
@@ -435,6 +394,7 @@ def detect_headlines(file_path):
             creator = "ftdna"
             creation_date = "unknown"
             #return {"ref": ref, "creator": creator, "creation_date": creation_date}
+    
    ############################################################################
     
     ref_map = {
@@ -463,13 +423,11 @@ def detect_headlines(file_path):
             for a_ref, keys in ref_map.items():
                 if any(k in lower_line for k in keys):
                     ref = a_ref
-                
+    # החזרת כל הנתונים הסופיים שנאספו כמילון
     return {"ref": ref, "creator": creator, "creation_date": creation_date}
 
 
-# ------------------------
-# טעינת רפרנס
-# ------------------------
+# פונקצייה לטעינת קובץ הרפרנס
 def load_reference(ref_path):
     global reference_loaded, reference_snps, reference_names, last_reference_file, last_ref_type
     
@@ -524,13 +482,8 @@ def load_reference(ref_path):
         messagebox.showerror("Error", f"Failed to load reference: {e}")
         #reference_loading_label.config(text="")
         
-        
 
-# ------------------------
-# ניתוח CSV
-# ------------------------
-
-        
+# פונקצייה לטעינת קובץ הדנא של המשתמש מסוגים שונים ומחברות בדיקה שונות     
 def load_dna_file():
     
     # כל פעם כשבוחרים קובץ דנא חדש הכל מתאפס ומחושב מהתחלה
@@ -584,22 +537,13 @@ def load_dna_file():
 
     positive_snps = []
     user_snps = {}
-    
-    ########################################################################################################
-      
+          
+    ##########################################################################################################
     # זה מטפל במקרה מיוחד של ביג Y של פטדנא שהוא בזיפ רגיל אבל הוא VCF
     is_ftdna_big_y_vcf = file_path.endswith(".zip") and get_first_file_name_in_zip(file_path) and get_first_file_name_in_zip(file_path).endswith(".vcf")
-        
-    ##########################################################################################################
+    # חייבים לדעת אם זה vcf או לא כי מבנה העמודות ב vcf שונה מהקבצים של החברות הרגילות
     is_vcf_file = file_path.endswith(".vcf") or file_path.endswith(".vcf.gz") or is_ftdna_big_y_vcf
-    
-    '''
-    # כבר טופל לעיל במשתנה is_ftdna_big_y_vcf ונשאר כאן רק לזיכרון
-    if not is_vcf_file and file_path.endswith(".zip"):
-        first_file_nane_in_zip = get_first_file_name_in_zip(file_path)
-        if first_file_nane_in_zip and first_file_nane_in_zip.endswith(".vcf"):
-            is_vcf_file = True        
-    '''
+    ##########################################################################################################
     
     try:
         with universal_opener(file_path, only_dna_if_zip=True) as f:
@@ -671,7 +615,7 @@ def load_dna_file():
                 if chrom not in ("Y", "24"):
                     continue
                 
-                # לא לכלול את המיקום הזה בקובץ של מייהירטייג כי הוא תמיד חיובי לכולם
+                # המיקום הזה בקובץ של מייהירטייג הוא תמיד חיובי לכולם ולכן להוסיף אחריו סימני שאלה וזה גם גורם שחישוב ענף וויפול לא יבוצע על פיו
                 if dna_file_info["creator"] == "myheritage" and rsid == "rs570569843":
                     allele_str += "???" # או פשוט לדלג על השורה באמצעות: continue
                  
@@ -796,16 +740,8 @@ def get_ab_from_clade(clade: str, from_snp = False):    # הצהרה על משת
         ab_clades_list = row.get('sub_clades', [])
         ab_clades_clean = [s.replace("*", "") for s in ab_clades_list]  # מסירים כוכביות
         
-        #####################################################################
-        # לדלג על שורות לא הגיוניות של ענפים שיש להם יותר מ 400 תתי ענפים וזה אומר שהם הוגדרו בטעות על ענף מידי גבוה ולא על האמיתי 
-        # בעתיד אחרי שכל ענף יאומת לפי סניפ מדוייק נצטרך להוריד את הבדיקה הזו
-        #len_clades = len(ab_clades_list)
-        #if len_clades > 400:
-        #    print(f"{row['AB-Group']} >400 sub_clades ({len_clades}) ")
-        #####################################################################
-        
         # בדיקה האם הענף המבוקש נמצא בתוך אחת מקבוצות אבותינו
-        # התוספת and len(ab_clades_list) < 300 נועדה לפתור בעיה של ענפים שהוגדרו מידי למעלה ותוסר בהמשך וכדלעיל 
+        # התוספת and len(ab_clades_list) < 300 נועדה לפתור בעיה של ענפים שהוגדרו מידי למעלה בעץ ותוסר בהמשך לאחר שנוודא שכל הענפים מוגדרים נכון 
         if clade in ab_clades_clean and len(ab_clades_list) < 300:
             clade_found_ab = True
             clade_found_ab_rows.append(row)
@@ -824,7 +760,8 @@ def get_ab_from_clade(clade: str, from_snp = False):    # הצהרה על משת
     return ab_string
 
     
-               
+# פונקצייה שמחשבת על איזה ענף בעץ וויפול יושב הנבדק לפי הווריאנטים החיוביים שלו
+# כברירת מחדל הענף הכי מדוייק הוא הענף הראשון במערך שמתקבל, שהוא בעל הציון סקור הכי גבוה
 def run_calculate_clade(Final_clade_index = 0):
     
     # דבר ראשון קוראים לפונקצייה שמקימה את מערך המידע על קבוצות אבותינו
@@ -843,8 +780,7 @@ def run_calculate_clade(Final_clade_index = 0):
 
         # קריאה ל־yclade עם מחרוזת אחת
         try:
-            
-            
+                      
             # clades = yclade.find_clade(last_positive_snp_string) זו הדרך הרגילה אבל היא ארוכה כי צריך כל פעם לטעון את העץ מחדש
             # לכן עושים את זה כך ישר על yfull_tree_data שכבר טעננו בתחילת הקוד פעם אחת
             snp_results = snps.parse_snp_results(last_positive_snp_string)
@@ -878,12 +814,6 @@ def run_calculate_clade(Final_clade_index = 0):
         # קבלת מידע על קבוצת אבותינו שהענף נמצא בה או שהיא נמצאת תחת הענף באמצעות פונקציה
         ab_string = get_ab_from_clade(Final_clade.name)
         
-        # מוצאים את ה-score הגבוה ביותר
-        #max_score = max(getattr(c, "score", 0) for c in clades)
-
-        # לוקחים את כל הקלאדים עם ה-score הזה
-        #top_clades = [c for c in clades if getattr(c, "score", 0) == max_score]
-
         # בטיחות: קח שדות רק אם קיימים 
         name = getattr(Final_clade, "name", "Unknown")
         age_info = getattr(Final_clade, "age_info", None)
@@ -922,10 +852,10 @@ def run_calculate_clade(Final_clade_index = 0):
             f" FORMED:  {formed} ybp\n"
             f"{ab_string_multiline}"
         )
-
+        
+        # לאחר שיש תוצאות הנחת כפתורי הלינקים לאילנות וייפול ופטדנא וכפתור שמירת התוצאות
         btn_yfull.grid(row=3, column=2, padx=5, pady=5)
         btn_ftdna.grid(row=4, column=2, padx=5, pady=5)    
-        # מניחים את הלחצן רק אחרי שיש תוצאות
         btn_save_results.grid(row=5, column=2, padx=5, pady=5)
          
         yclade_label.config(text="Analysis finished successfully.", fg="blue")
@@ -943,8 +873,7 @@ def run_calculate_clade(Final_clade_index = 0):
                 return run_calculate_clade(Final_clade_index = 1)
         '''
         '''
-        # זו עוד דרך לדעת שיש יותר מענף אחד שקיבל אותו סקור. ראו להלן
-        problem = False
+        # זו עוד דרך לדעת שיש יותר מענף אחד שקיבל אותו סקור. לפי זה שהענף האחרון הוא לא צאצא של הענף שלפניו
         if len(clades) >= 2:
             next_Final_clade = clades[Final_clade_index + 1] # or clades[1]
             clade_snp = get_snp_from_clade(next_Final_clade.name)
@@ -958,13 +887,7 @@ def run_calculate_clade(Final_clade_index = 0):
     except Exception as e:
         messagebox.showerror("Error", str(e))
         
-
-
-
-
-# ------------------------
-# שמירת תוצאות
-# ------------------------
+# פונקצייה לשמירת התוצאות המלאות של חישוב הענפים החיוביים מ run_calculate_clade
 def save_clades_to_file():
     if not last_clades:
         messagebox.showerror("Error", "No Clades to save.")
@@ -1004,13 +927,12 @@ def save_clades_to_file():
         messagebox.showerror("Error", f"Failed to save file: {e}")
 
 # ------------------------
-# בדיקת שם סניפ או מיקום גנומי בנתוני המשתמש וברפרנס
-# ------------------------
-       
+# פונקצייה לבדיקת שם סניפ או מיקום גנומי בנתוני המשתמש וברפרנס ומה הענף המתאים בוויפול ובאבותינו לווריאנט המבוקש     
 def check_search_input(ref_search = True):
     
     global reference_names, reference_snaps, user_snps, user_loaded, reference_loaded, last_positive_snp_string
     
+    # טוענים רפרנס לפי בחירת המשתמש אם עיין לא נטען
     if not reference_loaded:
         choice = messagebox.askyesnocancel("Reference not Autodetected", "Autodetected Reference faild\nChoose hg19, hg38, or None.\n\nYes = hg19, No = hg38, Cancel = None")
         ref_path = Msnps_hg19_path if choice else snps_hg38_path if (choice == False) else False #@@@@@@@@@    
@@ -1019,164 +941,210 @@ def check_search_input(ref_search = True):
     if not reference_loaded:
         return
     
+    # לוקחים את מה שהמשתמש הקליד בתיבת החיפוש
     search_input = entry_search.get().strip().upper()[:10] # מסירים רווחים הופכים לאותיות גדולות וחותכים את כל מה שמעבר ל 10 אותיות או ספרות
     
+    # אם הקליד מספר זה מיקום גנומי ובודקים ברפרנס ובנתוני המשתמש מה כתוב בשורה המתאימה למיקום גנומי זה
     if search_input.isdigit():
         pos = int(search_input)
         fields_reference = reference_snps.get(pos)
         fields_user = user_snps.get(pos) if user_loaded else False
+    # אם זה לא מספר אז מניחים שזה שם ווראינט ומחפשים אותו במילון של שמות הווראינטים שברפרנס
     else:  
         pos = reference_names.get(search_input)
         fields_reference = reference_snps.get(pos)
         fields_user = user_snps.get(pos) if user_loaded else False
-            
+    
+    # אם יש תוצאות מהרפרנס למיקום גנומי זה מציגים אותם בעמודת הרפרנס
     if fields_reference:
         ref_result_var.set(fields_reference)
         ref_result_label.config(fg="green", bg="SystemButtonFace")
     else:
         ref_result_var.set(f"{search_input} not found in reference file")
         ref_result_label.config(fg="blue", bg="yellow")
-        
+    
+    # אם יש תוצאות מהמשתמש למיקום גנומי זה מציגים בעמודת המשתמש
     if fields_user:
         user_result_var.set(fields_user)
         fg_for_user_result_label = "green" if fields_user["is_positive"] == "Yes" else "red"
-        user_result_label.config(fg=fg_for_user_result_label, bg="SystemButtonFace")
-        
+        user_result_label.config(fg=fg_for_user_result_label, bg="SystemButtonFace")       
     else:
         msg = f"{search_input} not found in user DNA_file" if user_loaded else "user DNA_file_not_loaded"
         user_result_var.set(msg)
         user_result_label.config(fg="blue", bg="yellow")
         
-    # במקרה שאין דנא של נבדק אז מריצים את חישוב המיקום על עץ ווייפול עבור הווריאנט המבוקש כאילו שהוא חיובי
+    # רק במקרה שלא טענו קובץ דנא של נבדק אז מריצים את חישוב המיקום על עץ ווייפול עבור הווריאנט המבוקש כאילו שהוא חיובי כולל בדיקת קבוצת אבותינו המתאימה
     if not user_loaded and fields_reference:
         last_positive_snp_string = f"{fields_reference['name']}+"
         run_calculate_clade()
         
         
-# ------------------------
-# הדבקה מהלוח
-# ------------------------
+# פונקצייה להדבקה מהלוח
 def paste_from_clipboard():
     clipboard_text = root.clipboard_get().strip()[:15]
     entry_search.delete(0, tk.END)
     entry_search.insert(0, clipboard_text)
     
-    
-def unload_ref():
-    global reference_snps, reference_names, last_reference_file, reference_loaded
-    reference_snps = {}      # pos -> ref_snp_name + ref_allele
-    reference_names = {}      # id_snp_name -> pos
-    last_reference_file = ""
-    reference_loaded = False
-    reference_loading_label.config(text="No reference_file loaded", fg="red")
-    btn_unload_ref.grid_forget()
-    ref_result_var.set("")
-    ref_result_label.config(text="", bg="SystemButtonFace")
-    reset_user()
+###############################################################################################################
+                           # איזור הגדרת החלון הגראפי של התוכנה
+###############################################################################################################
 
-
-# ------------------------
-# GUI
-# ------------------------
 root = tk.Tk()
-root.attributes("-topmost", True) # מבטיח שהחלון יהיה מעל כל האחרים
+#root.attributes("-topmost", True) # מבטיח שהחלון יהיה מעל כל האחרים
 # קביעת גודל התחלתי (רוחב x גובה)
 #root.geometry("650x500")
 
 # קביעת מינימום גודל
 #root.minsize(500, 500)
 
+# כותרת לחלון
 root.title("y-dna-analyzer | by Dr. simcha-gershon Bohrer (PhD.) | versin: 28 sep 2025")
 
-# מפריד אנכי
+# מפרידים אנכיים בין העמודות
 ttk.Separator(root, orient="vertical").grid(row=0, column=1, sticky="ns", padx=5, rowspan=20)
 ttk.Separator(root, orient="vertical").grid(row=0, column=3, sticky="ns", padx=5, rowspan=20)
 
-
+# כותרות לעמודות
 tk.Label(root, text="Reference file", font="david 14 bold").grid(row=0, column=0, padx=75, pady=10)
 tk.Label(root, text="Yclade", font="david 14 bold").grid(row=0, column=2, padx=75, pady=10)
 tk.Label(root, text="User DNA file", font="david 14 bold").grid(row=0, column=4, padx=75, pady=10)
 
-# כפתור לביטול טעינת קובץ הרפרנס
+# כפתור לביטול טעינת קובץ הרפרנס # המיקום גריד שלו מתבצע בפונקציית טעינת הרפרנס
 btn_unload_ref = tk.Button(root, text="unload_ref_file", command=unload_ref)
-# המיקום גריד שלו מתבצע בפונקציית טעינת הרפרנס
 
-# כפתור לביטול טעינת קובץ דנא של המשתמש
+# כפתור לביטול טעינת קובץ דנא של המשתמש # המיקום גריד שלו מתבצע בפונקציית טעינת קובץ דנא של המשתמש
 btn_unload_dna = tk.Button(root, text="unload_dna_file", command=reset_user)
-# המיקום גריד שלו מתבצע בפונקציית טעינת קובץ דנא של המשתמש
 
+# כפתור לבחירת קובץ הדנא של המשתמש
 btn_csv = tk.Button(root, text="Choose \nUser RAW-DNA File \nvcf/vcf.gz/txt/csv/gz/zip", command=load_dna_file)
 btn_csv.grid(row=1, column=4, rowspan=2)
 
+# תווית מידע על קובץ הרפרנס
 reference_loading_label = tk.Label(root, text="No reference-file loaded", fg="red")
 reference_loading_label.grid(row=4, column=0, padx=5, pady=5, rowspan=3)
 
+# תווית מידע על קובץ המשתמש
 dna_loading_label = tk.Label(root, text="No DNA-file loaded", fg="red")
 dna_loading_label.grid(row=4, column=4, padx=5, pady=5, rowspan=3)
 
+####################################################################################################
+
+# תווית מידע על הצלחת חישוב yclade
 yclade_label = tk.Label(root, text="Check SNP or load DNA-file", anchor="w", fg="red")
 yclade_label.grid(row=1, column=2, padx=5, pady=5)
 
+# תווית מידע של תוצאת חישובי yclade
 result_var = tk.StringVar()
 result_label = tk.Label(root, textvariable=result_var, fg="green")
 result_label.grid(row=2, column=2, padx=5, pady=10)
 
-def open_yfull():
-    webbrowser.open_new(last_yfull_link)
-def open_ftdna():
-    webbrowser.open_new(last_ftdna_link)
-
-btn_yfull = tk.Button(root, text="open clade in Yfull Tree", command=open_yfull)
-btn_ftdna = tk.Button(root, text="open clade in FTDNA Tree", command=open_ftdna)
+# כפתורי לינקיף לעצים של y-dna. וכפתור לשמירת תוצאות מלאות של yclade. # הגריד שלהם נמצא בפונקציית חישוב הקלייד
+btn_yfull = tk.Button(root, text="open clade in Yfull Tree", command= lambda: webbrowser.open_new(last_yfull_link))
+btn_ftdna = tk.Button(root, text="open clade in FTDNA-Discover Tree", command= lambda: webbrowser.open_new(last_ftdna_link))
 btn_save_results = tk.Button(root, text="Save Clades to TXT", command=save_clades_to_file)
-# הגריד שלהם נמצא בפונקציית חישוב הקלייד
 
-# בדיקת מיקום גנומי עם הכיתוב hg38
+##########################################################################################################3
+
+# קו מפריד מאוזן וגם תווית כותרת עבור איזור בדיקת מיקום גנומי ידני
 ttk.Separator(root, orient="horizontal").grid(row=10, column=2, sticky="ew", padx=5, pady=30)
 tk.Label(root, text="Check Y-SNP", font="david 14 bold").grid(row=11, column=2, padx=5, pady=5)
 
-# כפתור הדבקה משמאל עם בדיקה
+# כפתור הדבקת תוצאות מהלוח אל תיבת החיפוש
 btn_paste = tk.Button(root, text="Paste", command=paste_from_clipboard)
 btn_paste.grid(row=12, column=2, padx=5, pady=5)
 
-# בדיקת מיקום גנומי (עם תווית שמציינת hg38/hg19)
+# תיבת חיפוש 
 entry_search = tk.Entry(root, width=15)
 entry_search.grid(row=13, column=2, padx=5, pady=5)
 
-# כפתור בדיקה בנתוני המשתמש
+# כפתור בדיקה עבור הנתונים מתיבת החיפוש
 btn_check = tk.Button(root, text="Check: SNP name / Genomic position", command=check_search_input) 
 btn_check.grid(row=14, column=2, padx=5, pady=5)
 
-
-# תפריט לחצנים נוספים לאפשרויות נוספות
-mb=  Menubutton ( root, text= "Help & Options", relief=RAISED ,bg="gray87")
-mb.grid(column=4, row=12)
-mb.menu =  Menu ( mb, tearoff = 0 )
-mb["menu"] =  mb.menu
-mb.menu.add_command ( label= "open_yda_dir", command= lambda: subprocess.run(["explorer" if is_windows else "xdg-open", str(yda_dir_path)]))
-mb.menu.add_command ( label= "update_basic_files", command= update_required_files)
-'''
-
-menubar = Menu(root)
-root.config(menu=menubar)
-
-options_menu = Menu(menubar, tearoff=0)
-options_menu.add_command(label="open_yda_dir", command=lambda: subprocess.run(["explorer" if is_windows else "xdg-open", str(yda_dir_path)]))
-options_menu.add_command(label="update_basic_files", command=update_required_files)
-
-menubar.add_cascade(label="Help & Options", menu=options_menu)
-'''
-    
+# איזור לתוצאות החיפוש בנתוני הרפרנס
 ref_result_var = tk.StringVar()
 ref_result_label = tk.Label(root, textvariable=ref_result_var, fg="green")
 ref_result_label.grid(row=14, column=0)
 
+# איזור לתוצאות החיפוש בנתוני המשתמש
 user_result_var = tk.StringVar()
 user_result_label = tk.Label(root, textvariable=user_result_var, fg="green")
 user_result_label.grid(row=14, column=4)
 
+# תווית מידע
 tk.Label(root, text="NOTE: Each reference has different positions").grid(row=15, column=2, padx=5, pady=5)
 
+########################################################################################
+
+# תפריט לחצנים נוספים לאפשרויות נוספות
+mb=  Menubutton ( root, text= "Info & Options", relief=RAISED ,bg="gray87")
+mb.grid(column=4, row=12)
+mb.menu =  Menu ( mb, tearoff = 0 )
+mb["menu"] =  mb.menu
+mb.menu.add_command ( label= "Information", command= show_information)
+mb.menu.add_command ( label= "open yda dir", command= lambda: subprocess.run(["explorer" if is_windows else "xdg-open", str(yda_dir_path)]))
+mb.menu.add_command ( label= "update required files", command= update_required_files)
+
+'''
+# אם רוצים תפריט רגיל בחלק העליון של המסך
+menubar = Menu(root)
+root.config(menu=menubar)
+options_menu = Menu(menubar, tearoff=0)
+options_menu.add_command(label="open_yda_dir", command=lambda: subprocess.run(["explorer" if is_windows else "xdg-open", str(yda_dir_path)]))
+options_menu.add_command(label="update_basic_files", command=update_required_files)
+menubar.add_cascade(label="Help & Options", menu=options_menu)
+'''
+##########################################################################3
+
+# זה מריץ כל הזמן את החלון הראשי שיהיה קיים תמיד
 root.mainloop()
+
+
+##fileformat=MyHeritage
+##format=MHv1.0
+##chip=GSA
+##timestamp=2022-03-03 06:27:05 UTC
+##reference=build37
+# DOWNLOADED DATA WILL NO LONGER BE PROTECTED BY OUR SECURITY MEASURES.
+#RSID CHROMOSOME POSITION RESULT # אין סולמית במקור
+#rs547237130 1 72526 AA # אין סולמית במקור
+# כרומוזום Y נקרא בקובץ:   Y
+
+
+#AncestryDNA raw data download
+#This file was generated by AncestryDNA at: 01/23/2021 17:05:38 UTC
+#Data was collected using AncestryDNA array version: V2.0
+#Data is formatted using AncestryDNA converter version: V1.0
+#Below is a text version of your DNA file from Ancestry.com DNA, LLC.  THIS
+#Genetic data is provided below as five TAB delimited columns.  Each line 
+#corresponds to a SNP.  Column one provides the SNP identifier (rsID where 
+#possible).  Columns two and three contain the chromosome and basepair position 
+#of the SNP using human reference build 37.1 coordinates.  Columns four and five
+#rsid chromosome position allele1 allele2 # אין סולמית במקור
+#rs3131972 1 752721 G G # אין סולמית במקור
+# כרומוזום Y נקרא בקובץ:   24
+
+
+# This data file generated by 23andMe at: Fri Jul 31 00:41:13 2020
+# This file contains raw genotype data, including data that is not used in 23andMe reports.
+# This data has undergone a general quality review however only a subset of markers have been 
+# individually validated for accuracy. As such, this data is suitable only for research, 
+# educational, and informational use and not for medical or other use.
+# Below is a text version of your data.  Fields are TAB-separated
+# Each line corresponds to a single SNP.  For each SNP, we provide its identifier 
+# (an rsid or an internal id), its location on the reference human genome, and the 
+# genotype call oriented with respect to the plus strand on the human reference sequence.
+# We are using reference human assembly build 37 (also known as Annotation Release 104).
+# Note that it is possible that data downloaded at different times may be different due to ongoing 
+# improvements in our ability to call genotypes. More information about these changes can be found at:
+# https://you.23andme.com/p/24128f3ee36ceb87/tools/data/download/
+# More information on reference human assembly builds:
+# https://www.ncbi.nlm.nih.gov/assembly/GCF_000001405.13/
+# rsid chromosome position genotype # יש סולמית במקור
+#rs548049170 1 69869 TT # אין סולמית במקור
+# כרומוזום Y נקרא בקובץ:   Y
+
+# מייהירטייג: כתוב שם החברה, כתוב רפרנס 
+
 
 
