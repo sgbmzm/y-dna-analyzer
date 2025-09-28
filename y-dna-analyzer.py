@@ -1179,7 +1179,7 @@ mb.grid(column=4, row=12)
 mb.menu =  Menu ( mb, tearoff = 0 )
 mb["menu"] =  mb.menu
 mb.menu.add_command ( label= "open_yda_dir", command= lambda: subprocess.run(["explorer" if is_windows else "xdg-open", str(yda_dir_path)]))
-mb.menu.add_command ( label= "update_basic_files", command= lambda: update_required_files(root))
+mb.menu.add_command ( label= "update_basic_files", command= update_required_files)
 '''
 
 menubar = Menu(root)
@@ -1187,7 +1187,7 @@ root.config(menu=menubar)
 
 options_menu = Menu(menubar, tearoff=0)
 options_menu.add_command(label="open_yda_dir", command=lambda: subprocess.run(["explorer" if is_windows else "xdg-open", str(yda_dir_path)]))
-options_menu.add_command(label="update_basic_files", command=lambda: update_basic_files(root))
+options_menu.add_command(label="update_basic_files", command=update_required_files)
 
 menubar.add_cascade(label="Help & Options", menu=options_menu)
 '''
@@ -1203,3 +1203,5 @@ user_result_label.grid(row=14, column=4)
 tk.Label(root, text="NOTE: Each reference has different positions").grid(row=15, column=2, padx=5, pady=5)
 
 root.mainloop()
+
+
