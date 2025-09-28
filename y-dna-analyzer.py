@@ -417,7 +417,7 @@ def get_gz_internal_filename(filepath):
 # פונקצייה לבדיקה האם כתוב בקובץ באיזה רפרנס הוא משתמש באיזה תאריך נוצר ומי היוצר
 def detect_headlines(file_path):
     
-    ref = "unknown"
+    ref = None
     creator = "unknown"
     creation_date = "unknown"
        
@@ -470,19 +470,9 @@ def detect_headlines(file_path):
 # ------------------------
 # טעינת רפרנס
 # ------------------------
-def load_reference(ref_path="ask"):
+def load_reference(ref_path):
     global reference_loaded, reference_snps, reference_names, last_reference_file, last_ref_type
     
-    
-    if ref_path == "ask":
-        
-        messagebox.showwarning("select Reference file", f"Now Need to select Reference file. file can be downloaded from: https://ybrowse.org/gbrowse2/gff/")
-
-        ref_path = filedialog.askopenfilename(
-            title="Select Reference File",
-            filetypes=[("VCF files", "*.vcf *.vcf.gz *.json"), ("All files", "*.*")]
-        )
-        
     if not ref_path:
         return
     
@@ -559,19 +549,11 @@ def load_dna_file():
     # בדיקת או בחירת הרפרנס המתאים לקובץ הדנא של המשתמש
     ref_auto_detect = dna_file_info["ref"]
     
-    if ref_var.get() == "Aautodetect": 
-        ref_path = Msnps_hg19_path if ref_auto_detect == "hg19" else snps_hg38_path if ref_auto_detect == "hg38" else "ask"
+    ref_path = Msnps_hg19_path if ref_auto_detect == "hg19" else snps_hg38_path if ref_auto_detect == "hg38" else None #@@@@@@@@@
     
-        if not ref_auto_detect:
-            choice = messagebox.askyesnocancel("Reference not Autodetected", "Autodetected Reference faild\nChoose hg19, hg38, or select file manually.\n\nYes = hg19, No = hg38, Cancel = choose manually")
-            ref_path = Msnps_hg19_path if choice else snps_hg38_path if (choice == False) else "ask"
-        
-        # במקרה שקובץ הרפרנס לא נמצא בתיקיית הסקריפט הנוכחי יש לבחור קובץ באופן ידני
-        if ref_path != "ask" and not ref_path:
-            messagebox.showwarning("Reference file missing", f"Reference file:     {ref_path}     missing \nplease select file manually")
-            ref_path = "ask"       
-    else:
-        ref_path = "ask"
+    if not ref_auto_detect:
+        choice = messagebox.askyesnocancel("Reference not Autodetected", "Autodetected Reference faild\nChoose hg19, hg38, or None.\n\nYes = hg19, No = hg38, Cancel = None")
+        ref_path = Msnps_hg19_path if choice else snps_hg38_path if (choice == False) else None #@@@@@@@@@
     
     global last_reference_file, reference_loaded
     
@@ -934,11 +916,11 @@ def run_calculate_clade(Final_clade_index = 0):
         result_var.set(
             f"run for:     {'User DNA-file' if user_loaded else 'check Y-SNP button'}\n"
             f"YFull predicted clade (used ref {last_ref_type}):\n"
+            f"yfull tree version: {yfull_tree_data.version}\n"
             f" Name:    {name}\n"
             f" TMRCA:   {tmrca} ybp\n"
             f" FORMED:  {formed} ybp\n"
-            f"{ab_string_multiline}\n"
-            f"yfull tree version. {yfull_tree_data.version}"
+            f"{ab_string_multiline}"
         )
 
         btn_yfull.grid(row=3, column=2, padx=5, pady=5)
@@ -1030,8 +1012,8 @@ def check_search_input(ref_search = True):
     global reference_names, reference_snaps, user_snps, user_loaded, reference_loaded, last_positive_snp_string
     
     if not reference_loaded:
-        choice = messagebox.askyesnocancel("Reference not Autodetected", "Autodetected Reference faild\nChoose hg19, hg38, or select file manually.\n\nYes = hg19, No = hg38, Cancel = choose manually")
-        ref_path = Msnps_hg19_path if choice else snps_hg38_path if (choice == False) else "ask"       
+        choice = messagebox.askyesnocancel("Reference not Autodetected", "Autodetected Reference faild\nChoose hg19, hg38, or None.\n\nYes = hg19, No = hg38, Cancel = None")
+        ref_path = Msnps_hg19_path if choice else snps_hg38_path if (choice == False) else False #@@@@@@@@@    
         load_reference(ref_path)
         
     if not reference_loaded:
@@ -1114,13 +1096,6 @@ ttk.Separator(root, orient="vertical").grid(row=0, column=3, sticky="ns", padx=5
 tk.Label(root, text="Reference file", font="david 14 bold").grid(row=0, column=0, padx=75, pady=10)
 tk.Label(root, text="Yclade", font="david 14 bold").grid(row=0, column=2, padx=75, pady=10)
 tk.Label(root, text="User DNA file", font="david 14 bold").grid(row=0, column=4, padx=75, pady=10)
-
-
-# יצירת כפתורי רדיו
-# משתנה בחירה (מחזיק את הערך של הכפתור הנבחר)
-ref_var = tk.StringVar(value="Aautodetect")
-#tk.Radiobutton(root, text="Aautodetect Reference File     ", variable=ref_var, value="Aautodetect").grid(row=2, column=4)
-#tk.Radiobutton(root, text="Ask Reference File (vcf/vcf.gz)", variable=ref_var, value="ask").grid(row=3, column=4)
 
 # כפתור לביטול טעינת קובץ הרפרנס
 btn_unload_ref = tk.Button(root, text="unload_ref_file", command=unload_ref)
