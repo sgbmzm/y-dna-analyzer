@@ -1,1 +1,1 @@
-pyinstaller --noconsole --onefile --add-data "y-dna-analyzer.py;." --add-data "ab_groups_snp.csv;." --add-data "Msnps_hg19.vcf.gz;." --add-data "snps_hg38.vcf.gz;." y-dna-analyzer.py
+pyinstaller --noconsole --onefile --add-data "y-dna-analyzer.py;." --add-data "tree_13.05.0.json;." --add-data "ab_groups_snp.csv;." --add-data "Msnps_hg19.vcf.gz;." --add-data "snps_hg38.vcf.gz;." y-dna-analyzer.py
