@@ -186,7 +186,8 @@ else:
     # אם אפילו אחד מהם לא נמצא אז מנסים לעדכן את הקבצים ולהוריד אותם מהאינטרנט
     # אם לא מצליחים אז יודעים שאין לתוכנה את הקבצים הדרושים
     else:
-        if update_required_files():  # קוראים לפונקציית הורדת הקבצים ואם היא מצליחה היא מחזירה טרו ואז הקבצים בתיקייה הייעודית להם
+        # שואלים ואז קוראים לפונקציית הורדת הקבצים ואם היא מצליחה היא מחזירה טרו ואז הקבצים בתיקייה הייעודית להם
+        if messagebox.askyesno("required files question", "The software is missing the required files. \nWould you like to download them now?") and update_required_files():
             ab_groups_snp_path = yda_dir_path+'\ab_groups_snp.csv' 
             snps_hg38_path = yda_dir_path+'\snps_hg38.vcf.gz'
             Msnps_hg19_path = yda_dir_path+'\Msnps_hg19.vcf.gz'
@@ -199,7 +200,7 @@ else:
 
 # הודעה למשתמש אם הקבצים הדרושים חסרים        
 if not is_required_files_exist:
-    messagebox.showerror("Required files are missing", f"Required files are missing. Please connect to the internet and download them in the menu")
+    messagebox.showerror("Required files are missing", f"Required files are missing\nThe software is useless without these files\nPlease connect to the internet and download them from the menu")
    
 ##########################################################################################################
 # משתנים גלובליים עבור התוכנה
