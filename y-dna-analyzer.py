@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import *
 from tkinter import filedialog, messagebox, ttk
 import csv
 import os
@@ -7,14 +8,18 @@ import ast
 import gzip
 import zipfile
 import io
+import platform
 import webbrowser
+import subprocess
 from urllib.request import urlopen
-#from urllib.request import urlretrieve
 from pathlib import Path
 import json
 import yclade
 from yclade import tree, snps, find, const
 import networkx as nx
+
+# משתנה מאוד חשוב שקובע האם מערכת ההפעלה הנוכחית היא ווינדוס כי אם היא לא אז אי אפשר לעשות חלק מהפעולות
+is_windows = platform.system() == "Windows"
 
 # טעינת עץ ווייפול
 yfull_tree_data = tree.get_yfull_tree_data(version=None, data_dir=None)
@@ -28,49 +33,17 @@ def resource_path(relative_path):
         base_path = sys._MEIPASS
     except Exception:
         base_path = os.path.abspath(".")
-
     return os.path.join(base_path, relative_path)
 
-
-# כתובת עבור תיקיית הקבצים לצורך קבצים משתנים של התוכנה 
-#yda_dir_path = fr"{os.environ.get('HOMEDRIVE')}{os.environ.get('HOMEPATH')}\AppData\Roaming\y_dna_analyzer"
-yda_dir_path = os.path.expanduser("~\AppData\Roaming\y_dna_analyzer")
-
-# במידה ולא קיימת תיקיית הקבצים של התוכנה, יצירת תיקייה עבור קבצים משתנים של התוכנה בתוך אפפדאטא-רומינג
-if not os.path.exists(yda_dir_path):
-    os.mkdir(yda_dir_path)
-    
-# הגדרת הכתובת עבור קובץ קבוצות אבותינו 
-ab_groups_snp_path = yda_dir_path+'\ab_groups_snp.csv' 
-# אם אין קובץ בשם "מיקומים-ערוך" בתיקיית התוכנה באפפ-דאטה, אז יש לקבל מיקום מוחלט של קובץ המיקומים הדיפולטי שנמצא בתיקיית ההתקנה
-if not os.path.exists(ab_groups_snp_path):
-    ab_groups_snp_path = resource_path("ab_groups_snp.csv")  # כאן את שם הקובץ שלך
-    
-snps_hg38_path = yda_dir_path+'\snps_hg38.vcf.gz'
-if not os.path.exists(ab_groups_snp_path):
-    snps_hg38_path = resource_path("snps_hg38.vcf.gz")  # כאן את שם הקובץ שלך
-    
-Msnps_hg19_path = resource_path("Msnps_hg19.vcf.gz")
-
-yfull_tree_dir = yda_dir_path
-
-
-
-# פונקצייה שמחזירה את מספר הגרסה העדכנית ביותר של עץ וויפול
-def get_latest_yfull_tree_version() -> str:
-    url = "https://raw.githubusercontent.com/YFullTeam/YTree/master/current_version.txt"
-    with urlopen(url) as resp:
-        return resp.read().decode("utf-8").strip()
-    
-# פונקצייה לעדכון שלושת הקבצים החשובים שעליהם מסתמכת התוכנה
-def update_basic_files(root):
+# פונקצייה לעדכון ארבעת הקבצים החשובים שעליהם מסתמכת התוכנה
+def update_required_files():
     """
-    מוריד שלושת הקבצים עם התקדמות הורדה, בלי להשתמש ב-Frame.
+    מוריד הקבצים הדרושים לתוכנה.
     """
     # שאלה למשתמש
     proceed = messagebox.askyesno(
         "Download Files",
-        "Are you sure you want to download the three files?"
+        "Are you sure you want to download/update required files?"
     )
     if not proceed:
         messagebox.showinfo("Download canceled", "The download was canceled.")
@@ -84,7 +57,8 @@ def update_basic_files(root):
     # רשימת קבצים להורדה
     files_to_download = [
         ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/ab_groups_snp.csv", "ab_groups_snp.csv"),
-        ("https://ybrowse.org/gbrowse2/gff/snps_hg38.vcf.gz", "snps_hg38.vcf.gz")
+        ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/Msnps_hg19.vcf.gz", "Msnps_hg19.vcf.gz"),
+        ("https://ybrowse.org/gbrowse2/gff/snps_hg38.vcf.gz", "snps_hg38.vcf.gz"),
     ]
 
     # גרסת עץ YFull עדכנית
@@ -93,12 +67,14 @@ def update_basic_files(root):
         version = resp.read().decode("utf-8").strip()
     yfull_tree_url = f"https://github.com/YFullTeam/YTree/raw/refs/heads/master/ytree/tree_{version}.zip"
     files_to_download.append((yfull_tree_url, f"tree_{version}.zip"))
-
-    # יצירת progress bar ישירות ב-root
-    progress_bar = ttk.Progressbar(root, length=200, maximum=len(files_to_download))
-    progress_bar.grid(row=12, column=4, padx=5, pady=5)
-    root.update()
-
+    
+    jroot = Tk()
+    jroot.title("update_required_files")
+    jroot.attributes("-topmost", True) # מבטיח שהחלון יהיה מעל כל האחרים
+    progress_bar = ttk.Progressbar(jroot, length=200, maximum=len(files_to_download))
+    progress_bar.pack()
+    jroot.update()
+    
     # הורדה ושמירה
     failed_files = []
     for i, (url, filename) in enumerate(files_to_download, start=1):
@@ -109,17 +85,85 @@ def update_basic_files(root):
         except Exception as e:
             failed_files.append(f"{filename} ({e})")
         progress_bar['value'] = i
-        root.update()
+        jroot.update()
+
+    # הסרת החלון
+    jroot.destroy()
 
     # הודעה על הצלחה/כשל
     if not failed_files:
         messagebox.showinfo("Download Complete", "All files were downloaded successfully.")
+        return True
     else:
         messagebox.showerror("Download Failed", f"Failed to download:\n" + "\n".join(failed_files))
+        return False
         
-    # הסרת ה-progress bar מהחלון
-    progress_bar.destroy()
 
+# כתובת עבור תיקיית הקבצים לצורך קבצים משתנים של התוכנה 
+#yda_dir_path = fr"{os.environ.get('HOMEDRIVE')}{os.environ.get('HOMEPATH')}\AppData\Roaming\y_dna_analyzer"
+if is_windows:
+    yda_dir_path = os.path.expanduser(r"~\AppData\Roaming\y_dna_analyzer")
+else:
+    yda_dir_path = os.path.expanduser("~/y_dna_analyzer")
+
+# במידה ולא קיימת תיקיית הקבצים של התוכנה, יצירת תיקייה עבור קבצים משתנים של התוכנה בתוך אפפדאטא-רומינג
+if not os.path.exists(yda_dir_path):
+    os.mkdir(yda_dir_path)
+    
+
+yfull_tree_dir = yda_dir_path
+    
+# משתנה גלובלי מאוד חשוב ששומר את המידע האם הקבצים הדרושים לתוכנה קיימים
+is_required_files_exist = False
+    
+# הגדרת הנתיבים לקבצים הדרושים לתוכנה בתיקייה הייעודית לקבצי התוכנה
+ab_groups_snp_path = os.path.join(yda_dir_path, "ab_groups_snp.csv")
+snps_hg38_path = os.path.join(yda_dir_path, "snps_hg38.vcf.gz")
+Msnps_hg19_path = os.path.join(yda_dir_path, "Msnps_hg19.vcf.gz")
+
+# כל הקבצים הדרושים בתוך רשימה
+required_files = [ab_groups_snp_path, snps_hg38_path, Msnps_hg19_path]
+
+# אם כל הקבצים קיימים בתיקייה הייעודית אפשר להמשיך בתוכנה
+if all(os.path.exists(f) for f in required_files):
+    is_required_files_exist = True
+# אם אפילו אחד מהם לא קיים מנסים במיקום השני שהוא בתיקייה שממנה רצה התוכנה
+else:
+    ab_groups_snp_path = resource_path("ab_groups_snp.csv")  # כאן את שם הקובץ שלך
+    snps_hg38_path = resource_path("snps_hg38.vcf.gz")
+    Msnps_hg19_path = resource_path("Msnps_hg19.vcf.gz")
+
+    # כל הקבצים הדרושים בתוך רשימה
+    required_files = [ab_groups_snp_path, snps_hg38_path, Msnps_hg19_path]
+
+    # אם כולם נמצאים במיקום השני אז אפשר להמשיך בתוכנה
+    if all(os.path.exists(f) for f in required_files):
+        is_required_files_exist = True
+    # אם אפילו אחד מהם לא נמצא אז מנסים לעדכן את הקבצים ולהוריד אותם מהאינטרנט
+    # אם לא מצליחים אז יודעים שאין לתוכנה את הקבצים הדרושים
+    else:
+        if update_required_files():  
+            ab_groups_snp_path = yda_dir_path+'\ab_groups_snp.csv' 
+            snps_hg38_path = yda_dir_path+'\snps_hg38.vcf.gz'
+            Msnps_hg19_path = yda_dir_path+'\Msnps_hg19.vcf.gz'
+            is_required_files_exist = True
+        else:
+            ab_groups_snp_path = ""
+            snps_hg38_path = ""
+            Msnps_hg19_path = ""
+            is_required_files_exist = False
+
+# הודעה למשתמש אם הקבצים הדרושים חסרים        
+if not is_required_files_exist:
+    messagebox.showerror("Required files are missing", f"Required files are missing. Please connect to the internet and download them in the menu")
+   
+
+# פונקצייה שמחזירה את מספר הגרסה העדכנית ביותר של עץ וויפול
+def get_latest_yfull_tree_version() -> str:
+    url = "https://raw.githubusercontent.com/YFullTeam/YTree/master/current_version.txt"
+    with urlopen(url) as resp:
+        return resp.read().decode("utf-8").strip()
+    
 
 
 # ------------------------
@@ -429,8 +473,6 @@ def detect_headlines(file_path):
 def load_reference(ref_path="ask"):
     global reference_loaded, reference_snps, reference_names, last_reference_file, last_ref_type
     
-    if ref_path != "ask":
-        ref_path = resource_path(ref_path)
     
     if ref_path == "ask":
         
@@ -484,7 +526,7 @@ def load_reference(ref_path="ask"):
                         
         reference_loaded = True
         reference_loading_label.config(fg="blue", text=f"Reference loaded: \nname: {os.path.basename(ref_path)}  \n Y-SNPs: {len(reference_snps)}  \ntype: {last_ref_type} \ndate: {detect_headlines(ref_path)['creation_date']}")
-        last_reference_file = resource_path(ref_path)
+        last_reference_file = ref_path
         btn_unload_ref.grid(row=1, column=0, padx=5, pady=5)
         
         
@@ -518,14 +560,14 @@ def load_dna_file():
     ref_auto_detect = dna_file_info["ref"]
     
     if ref_var.get() == "Aautodetect": 
-        ref_path = "Msnps_hg19.vcf.gz" if ref_auto_detect == "hg19" else "snps_hg38.vcf.gz" if ref_auto_detect == "hg38" else "ask"
+        ref_path = Msnps_hg19_path if ref_auto_detect == "hg19" else snps_hg38_path if ref_auto_detect == "hg38" else "ask"
     
         if not ref_auto_detect:
             choice = messagebox.askyesnocancel("Reference not Autodetected", "Autodetected Reference faild\nChoose hg19, hg38, or select file manually.\n\nYes = hg19, No = hg38, Cancel = choose manually")
-            ref_path = "Msnps_hg19.vcf.gz" if choice else "snps_hg38.vcf.gz" if (choice == False) else "ask"
+            ref_path = Msnps_hg19_path if choice else snps_hg38_path if (choice == False) else "ask"
         
         # במקרה שקובץ הרפרנס לא נמצא בתיקיית הסקריפט הנוכחי יש לבחור קובץ באופן ידני
-        if ref_path != "ask" and not resource_path(ref_path):
+        if ref_path != "ask" and not ref_path:
             messagebox.showwarning("Reference file missing", f"Reference file:     {ref_path}     missing \nplease select file manually")
             ref_path = "ask"       
     else:
@@ -533,8 +575,6 @@ def load_dna_file():
     
     global last_reference_file, reference_loaded
     
-    if ref_path != "ask":
-        ref_path = resource_path(ref_path)
         
     if not last_reference_file == ref_path:
         reference_loaded = False
@@ -991,7 +1031,7 @@ def check_search_input(ref_search = True):
     
     if not reference_loaded:
         choice = messagebox.askyesnocancel("Reference not Autodetected", "Autodetected Reference faild\nChoose hg19, hg38, or select file manually.\n\nYes = hg19, No = hg38, Cancel = choose manually")
-        ref_path = "Msnps_hg19.vcf.gz" if choice else "snps_hg38.vcf.gz" if (choice == False) else "ask"       
+        ref_path = Msnps_hg19_path if choice else snps_hg38_path if (choice == False) else "ask"       
         load_reference(ref_path)
         
     if not reference_loaded:
@@ -1057,6 +1097,7 @@ def unload_ref():
 # GUI
 # ------------------------
 root = tk.Tk()
+root.attributes("-topmost", True) # מבטיח שהחלון יהיה מעל כל האחרים
 # קביעת גודל התחלתי (רוחב x גובה)
 #root.geometry("650x500")
 
@@ -1078,8 +1119,8 @@ tk.Label(root, text="User DNA file", font="david 14 bold").grid(row=0, column=4,
 # יצירת כפתורי רדיו
 # משתנה בחירה (מחזיק את הערך של הכפתור הנבחר)
 ref_var = tk.StringVar(value="Aautodetect")
-tk.Radiobutton(root, text="Aautodetect Reference File     ", variable=ref_var, value="Aautodetect").grid(row=2, column=0)
-tk.Radiobutton(root, text="Ask Reference File (vcf/vcf.gz)", variable=ref_var, value="ask").grid(row=3, column=0)
+#tk.Radiobutton(root, text="Aautodetect Reference File     ", variable=ref_var, value="Aautodetect").grid(row=2, column=4)
+#tk.Radiobutton(root, text="Ask Reference File (vcf/vcf.gz)", variable=ref_var, value="ask").grid(row=3, column=4)
 
 # כפתור לביטול טעינת קובץ הרפרנס
 btn_unload_ref = tk.Button(root, text="unload_ref_file", command=unload_ref)
@@ -1131,7 +1172,25 @@ entry_search.grid(row=13, column=2, padx=5, pady=5)
 btn_check = tk.Button(root, text="Check: SNP name / Genomic position", command=check_search_input) 
 btn_check.grid(row=14, column=2, padx=5, pady=5)
 
-tk.Button(root, text="Update Files", command=lambda: update_basic_files(root)).grid(row=12, column=4, padx=5, pady=5)
+
+# תפריט לחצנים נוספים לאפשרויות נוספות
+mb=  Menubutton ( root, text= "Help & Options", relief=RAISED ,bg="gray87")
+mb.grid(column=4, row=12)
+mb.menu =  Menu ( mb, tearoff = 0 )
+mb["menu"] =  mb.menu
+mb.menu.add_command ( label= "open_yda_dir", command= lambda: subprocess.run(["explorer" if is_windows else "xdg-open", str(yda_dir_path)]))
+mb.menu.add_command ( label= "update_basic_files", command= lambda: update_required_files(root))
+'''
+
+menubar = Menu(root)
+root.config(menu=menubar)
+
+options_menu = Menu(menubar, tearoff=0)
+options_menu.add_command(label="open_yda_dir", command=lambda: subprocess.run(["explorer" if is_windows else "xdg-open", str(yda_dir_path)]))
+options_menu.add_command(label="update_basic_files", command=lambda: update_basic_files(root))
+
+menubar.add_cascade(label="Help & Options", menu=options_menu)
+'''
     
 ref_result_var = tk.StringVar()
 ref_result_label = tk.Label(root, textvariable=ref_result_var, fg="green")
@@ -1144,5 +1203,3 @@ user_result_label.grid(row=14, column=4)
 tk.Label(root, text="NOTE: Each reference has different positions").grid(row=15, column=2, padx=5, pady=5)
 
 root.mainloop()
-
-
