@@ -2,6 +2,7 @@
 import tkinter as tk
 from tkinter import *
 from tkinter import filedialog, messagebox, ttk
+from platformdirs import user_data_dir
 import csv
 import os
 import re
@@ -15,9 +16,12 @@ import subprocess
 from urllib.request import urlopen
 from pathlib import Path
 import json
-import yclade
+#import yclade
 from yclade import tree, snps, find, const
 import networkx as nx
+
+# משתנה מאוד חשוב שקובע האם מערכת ההפעלה הנוכחית היא ווינדוס כי אם היא לא אז אי אפשר לעשות חלק מהפעולות
+is_windows = platform.system() == "Windows"
 
 ##########################################################################
 # תוכן המידע על התוכנה
@@ -58,33 +62,26 @@ def show_information():
 
 #####################################################################################
 
-# משתנה מאוד חשוב שקובע האם מערכת ההפעלה הנוכחית היא ווינדוס כי אם היא לא אז אי אפשר לעשות חלק מהפעולות
-is_windows = platform.system() == "Windows"
-
-# כתובת עבור תיקיית הקבצים לצורך קבצים משתנים של התוכנה 
-#yda_dir_path = fr"{os.environ.get('HOMEDRIVE')}{os.environ.get('HOMEPATH')}\AppData\Roaming\y_dna_analyzer"
-if is_windows:
-    yda_dir_path = os.path.expanduser(r"~\AppData\Roaming\y_dna_analyzer")
-else:
-    yda_dir_path = os.path.expanduser("~/y_dna_analyzer")
-
-# במידה ולא קיימת תיקיית הקבצים של התוכנה, יצירת תיקייה עבור קבצים משתנים של התוכנה
-if not os.path.exists(yda_dir_path):
-    os.mkdir(yda_dir_path)
+# נתיב לתיקיית הנתונים של קבצים הדרושים לתוכנה
+yda_dir_path = user_data_dir(appname="y_dna_analyzer", appauthor=False, roaming=False)
+# יצירת התיקייה אם לא קיימת ולא תהיה שגיאה אם כן קיימת
+os.makedirs(yda_dir_path, exist_ok=True)
 
 #######################################################################################################
-# טעינת עץ ווייפול
-yfull_tree_data = tree.get_yfull_tree_data(version=None, data_dir=None)
-yfull_tree_dir = yda_dir_path
 
 # פונקצייה שמחזירה את מספר הגרסה העדכנית ביותר של עץ וויפול
 def get_latest_yfull_tree_version() -> str:
     url = "https://raw.githubusercontent.com/YFullTeam/YTree/master/current_version.txt"
-    with urlopen(url) as resp:
-        return resp.read().decode("utf-8").strip()
-    
-######################################################################################################
+    try:
+        with urlopen(url) as resp:
+            return resp.read().decode("utf-8").strip()
+    except Exception as e:
+        print(f"שגיאה בקריאת גרסת העץ העדכנית: {e}")
+        return None  # ערך ברירת מחדל
 
+######################################################################################################
+                    # איזור הטיפול בקבצים הדרושים לתוכנה
+######################################################################################################
 # פונקצייה לקבל מיקום מוחלט של קובץ שאמור להיות כלול בתוכנה
 # ראו: https://stackoverflow.com/questions/7674790/bundling-data-files-with-pyinstaller-onefile/44352931#44352931
 def resource_path(relative_path):
@@ -95,6 +92,7 @@ def resource_path(relative_path):
     except Exception:
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
+
 
 # פונקצייה לעדכון הקבצים החשובים הדרושים לפעולת התוכנה
 def update_required_files():
@@ -116,16 +114,18 @@ def update_required_files():
     files_to_download = [
         ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/ab_groups_snp.csv", "ab_groups_snp.csv"),
         ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/Msnps_hg19.vcf.gz", "Msnps_hg19.vcf.gz"),
+        ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/yda_yfull_tree.json", "yda_yfull_tree.json"),
+        ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/yda_yfull_tree_version.txt", "yda_yfull_tree_version.txt"),
         ("https://ybrowse.org/gbrowse2/gff/snps_hg38.vcf.gz", "snps_hg38.vcf.gz"),
     ]
-
+    '''
     # גרסת עץ YFull הכי עדכנית והוספתה לרשימת ההורדות
     version_url = "https://raw.githubusercontent.com/YFullTeam/YTree/master/current_version.txt"
     with urlopen(version_url) as resp:
         version = resp.read().decode("utf-8").strip()
     yfull_tree_url = f"https://github.com/YFullTeam/YTree/raw/refs/heads/master/ytree/tree_{version}.zip"
     files_to_download.append((yfull_tree_url, f"tree_{version}.zip"))
-    
+    '''
     # ממשג גרפי להצגת התקדמות ההורדה
     jroot = Tk()
     jroot.title("update_required_files")
@@ -156,54 +156,85 @@ def update_required_files():
     else:
         messagebox.showerror("Download Failed", f"Failed to download:\n" + "\n".join(failed_files))
         return False
-    
-# משתנה גלובלי מאוד חשוב ששומר את המידע האם הקבצים הדרושים לתוכנה קיימים
-is_required_files_exist = False
-    
-# הגדרת הנתיבים לקבצים הדרושים לתוכנה בתיקייה הייעודית לקבצי התוכנה
-ab_groups_snp_path = os.path.join(yda_dir_path, "ab_groups_snp.csv")
-snps_hg38_path = os.path.join(yda_dir_path, "snps_hg38.vcf.gz")
-Msnps_hg19_path = os.path.join(yda_dir_path, "Msnps_hg19.vcf.gz")
 
-# כל הקבצים הדרושים בתוך רשימה
-required_files = [ab_groups_snp_path, snps_hg38_path, Msnps_hg19_path]
-
-# אם כל הקבצים קיימים בתיקייה הייעודית אפשר להמשיך בתוכנה
-if all(os.path.exists(f) for f in required_files):
-    is_required_files_exist = True
-# אם אפילו אחד מהם לא קיים מנסים במיקום השני שהוא בתיקייה שממנה רצה התוכנה
-else:
-    ab_groups_snp_path = resource_path("ab_groups_snp.csv")  # כאן את שם הקובץ שלך
-    snps_hg38_path = resource_path("snps_hg38.vcf.gz")
-    Msnps_hg19_path = resource_path("Msnps_hg19.vcf.gz")
+# פונקצייה חשובה מאוד שטוענת את כל הקבצים הדרושים לפעילות התוכנה ומחזירה את המשתנים הדרושים 
+def get_required_files():
+    # משתנה גלובלי מאוד חשוב ששומר את המידע האם הקבצים הדרושים לתוכנה קיימים
+    is_required_files_exist = False
+        
+    # הגדרת הנתיבים לקבצים הדרושים לתוכנה בתיקייה הייעודית לקבצי התוכנה
+    ab_groups_snp_path = os.path.join(yda_dir_path, "ab_groups_snp.csv")
+    snps_hg38_path = os.path.join(yda_dir_path, "snps_hg38.vcf.gz")
+    Msnps_hg19_path = os.path.join(yda_dir_path, "Msnps_hg19.vcf.gz")
+    yda_tree_path = os.path.join(yda_dir_path, f"yda_yfull_tree.json")
+    yda_tree_version = os.path.join(yda_dir_path, f"yda_yfull_tree_version.txt")
 
     # כל הקבצים הדרושים בתוך רשימה
-    required_files = [ab_groups_snp_path, snps_hg38_path, Msnps_hg19_path]
+    required_files = [ab_groups_snp_path, snps_hg38_path, Msnps_hg19_path, yda_tree_path, yda_tree_version]
 
-    # אם כולם נמצאים במיקום השני אז אפשר להמשיך בתוכנה
+    # אם כל הקבצים קיימים בתיקייה הייעודית אפשר להמשיך בתוכנה
     if all(os.path.exists(f) for f in required_files):
         is_required_files_exist = True
-    # אם אפילו אחד מהם לא נמצא אז מנסים לעדכן את הקבצים ולהוריד אותם מהאינטרנט
-    # אם לא מצליחים אז יודעים שאין לתוכנה את הקבצים הדרושים
+    # אם אפילו אחד מהם לא קיים מנסים במיקום השני שהוא בתיקייה שממנה רצה התוכנה
     else:
-        # שואלים ואז קוראים לפונקציית הורדת הקבצים ואם היא מצליחה היא מחזירה טרו ואז הקבצים בתיקייה הייעודית להם
-        if messagebox.askyesno("required files question", "The software is missing the required files. \nWould you like to download them now?") and update_required_files():
-            ab_groups_snp_path = yda_dir_path+'\ab_groups_snp.csv' 
-            snps_hg38_path = yda_dir_path+'\snps_hg38.vcf.gz'
-            Msnps_hg19_path = yda_dir_path+'\Msnps_hg19.vcf.gz'
-            is_required_files_exist = True
-        else:
-            ab_groups_snp_path = None
-            snps_hg38_path = None
-            Msnps_hg19_path = None
-            is_required_files_exist = False
+        ab_groups_snp_path = resource_path("ab_groups_snp.csv")  # כאן את שם הקובץ שלך
+        snps_hg38_path = resource_path("snps_hg38.vcf.gz")
+        Msnps_hg19_path = resource_path("Msnps_hg19.vcf.gz")
+        yda_tree_path = resource_path("yda_yfull_tree.json")
+        yda_tree_version = resource_path("yda_yfull_tree_version.txt")
 
-# הודעה למשתמש אם הקבצים הדרושים חסרים        
-if not is_required_files_exist:
-    messagebox.showerror("Required files are missing", f"Required files are missing\nThe software is useless without these files\nPlease connect to the internet and download them from the menu")
-   
+        # כל הקבצים הדרושים בתוך רשימה
+        required_files = [ab_groups_snp_path, snps_hg38_path, Msnps_hg19_path, yda_tree_path, yda_tree_version]
+
+        # אם כולם נמצאים במיקום השני אז אפשר להמשיך בתוכנה
+        if all(os.path.exists(f) for f in required_files):
+            is_required_files_exist = True
+        # אם אפילו אחד מהם לא נמצא אז מנסים לעדכן את הקבצים ולהוריד אותם מהאינטרנט
+        # אם לא מצליחים אז יודעים שאין לתוכנה את הקבצים הדרושים
+        else:
+            # שואלים ואז קוראים לפונקציית הורדת הקבצים ואם היא מצליחה היא מחזירה טרו ואז הקבצים בתיקייה הייעודית להם
+            if messagebox.askyesno("required files question", "The software is missing the required files. \nWould you like to download them now?") and update_required_files():
+                ab_groups_snp_path = os.path.join(yda_dir_path, "ab_groups_snp.csv")
+                snps_hg38_path = os.path.join(yda_dir_path, "snps_hg38.vcf.gz")
+                Msnps_hg19_path = os.path.join(yda_dir_path, "Msnps_hg19.vcf.gz")
+                yda_tree_path = os.path.join(yda_dir_path, f"yda_yfull_tree.json")
+                yda_tree_version = os.path.join(yda_dir_path, f"yda_yfull_tree_version.txt")
+                is_required_files_exist = True
+            else:
+                ab_groups_snp_path = None
+                snps_hg38_path = None
+                Msnps_hg19_path = None
+                yda_tree_path = None
+                yda_tree_version = None
+                is_required_files_exist = False
+
+    # הודעה למשתמש אם הקבצים הדרושים חסרים        
+    if not is_required_files_exist:
+        messagebox.showerror("Required files are missing", f"Required files are missing\nThe software is useless without these files\nPlease connect to the internet and download them from the menu")
+
+    # אם יש את כל הקבצים הדרושים בודקים מה תאריך הגרסה של עץ ווייפול שבו משתמשים וטוענים אותו לשימוש בתוכנה זו
+    if is_required_files_exist:
+        with open(yda_tree_version, "r", encoding="utf-8") as f:
+            string_version = f.readline().strip()  # קורא את השורה הראשונה ומסיר רווחים/סוף שורה
+        ###########################################################    
+        # זה בודק מה הגרסה האחרונה ואם אין חיבור לרשת או כל שגיאה אחרת זה מחזיר none
+        latest_tree_version = get_latest_yfull_tree_version()
+        # רק אם משתמשים בעץ שנמצא בתיקיית הנתונים (yda_dir_path in yda_tree_path) ויש גרסה עדכנית יותר באתר 
+        if latest_tree_version and (yda_dir_path in yda_tree_path) and latest_tree_version != string_version:
+            # מוסיפים סימני קריאה למספר הגרסה
+            _version += "( !!!)"
+        ############################################################    
+        # טוען את עץ וייפול לשימוש בתוכנה כולל מידע על הגרסה (file_path: Path, version: str | None = None) -> YTreeData
+        yfull_tree_data = tree.yfull_tree_to_tree_data(Path(yda_tree_path), version=string_version)
+    else:
+        yfull_tree_data = None
+            
+    return is_required_files_exist, ab_groups_snp_path, snps_hg38_path, Msnps_hg19_path, yda_tree_path, yda_tree_version, yfull_tree_data
+
+####################################################################################################
+                # משתנים גלובליים עבור התוכנה
 ##########################################################################################################
-# משתנים גלובליים עבור התוכנה
+
 last_clades = [] # שומר את רשימת התוצאות שיוצאת מפונקציית run_calculate_clade לצורך שימוש עתידי
 last_positive_snp_string = "" # שומר את רשימת הווריאנטים החיוביים שבהם משתמשים לחישוב הקלייד ב run_calculate_clade
 last_ref_type = "" 
@@ -255,6 +286,17 @@ def unload_ref():
     ref_result_var.set("")
     ref_result_label.config(text="", bg="SystemButtonFace")
     reset_user() # מוסיפים ביטול של טעינת קובץ המשתמש כי בלי רפרנס אי אפשר להציג נתוני משתמש
+    
+    
+# clades = yclade.find_clade(last_positive_snp_string) זו הדרך הרגילה אבל היא ארוכה כי צריך כל פעם לטעון את העץ מחדש
+# לכן עושים את זה כך ישר על yfull_tree_data שכבר טעננו בתחילת הקוד פעם אחת
+# זה במקום yclade.find_clade 
+def yda_find_clade(snp_string):
+    snp_results = snps.parse_snp_results(snp_string)
+    snp_results = snps.normalize_snp_results(snp_results=snp_results, snp_aliases=yfull_tree_data.snp_aliases)
+    clades = find.get_ordered_clade_details(tree=yfull_tree_data, snps=snp_results)
+    return clades
+
 
 
 # פונקצייה מאוד חשובה שמחזירה את שמות כל ענפי הצאצאים שתחת ענף מסויים בוויפול
@@ -724,7 +766,8 @@ def get_ab_from_clade(clade: str, from_snp = False):    # הצהרה על משת
     global last_ab_data, yfull_tree_data
     # אם רוצים מסניפ אז צריך קודם לדעת אל איזה ענף הסניפ הזה יושב בעץ ואז ממשיכים עם הענף המתאים
     if from_snp:
-        clade = yclade.find_clade(clade_snp)
+        #clade = yclade.find_clade(clade_snp)
+        clade = yda_find_clade(snp_string)
     # מוציאם משם הקלייד את הווריאנט שמגדיר אותו באמצעות פונקצייה
     clade_snp = get_snp_from_clade(clade)
     # חישוב כל הענפים שתחת הענף מחזיר רשימה
@@ -780,20 +823,15 @@ def run_calculate_clade(Final_clade_index = 0):
         root.update()
 
         # קריאה ל־yclade עם מחרוזת אחת
-        try:
-                      
-            # clades = yclade.find_clade(last_positive_snp_string) זו הדרך הרגילה אבל היא ארוכה כי צריך כל פעם לטעון את העץ מחדש
-            # לכן עושים את זה כך ישר על yfull_tree_data שכבר טעננו בתחילת הקוד פעם אחת
-            snp_results = snps.parse_snp_results(last_positive_snp_string)
-            snp_results = snps.normalize_snp_results(snp_results=snp_results, snp_aliases=yfull_tree_data.snp_aliases)
-            clades = find.get_ordered_clade_details(tree=yfull_tree_data, snps=snp_results)
-            
-                    
+        try:                      
+            clades = yda_find_clade(last_positive_snp_string)
+                            
         except Exception as e:
-            messagebox.showerror("Error", f"yclade.find_clade failed: {e}")
+            messagebox.showerror("Error", f"find_clade failed: {e}")
             yclade_label.config(text="")
             return
-
+        
+        # שמירת הנתונים במשתנה הגלובלי
         last_clades = clades
 
         if not clades:
@@ -1095,7 +1133,13 @@ options_menu.add_command(label="open_yda_dir", command=lambda: subprocess.run(["
 options_menu.add_command(label="update_basic_files", command=update_required_files)
 menubar.add_cascade(label="Help & Options", menu=options_menu)
 '''
-##########################################################################3
+##########################################################################
+# הבאת כל המשתנים של הקבצים הדרושים לתוכנה באמצעות פונקציית get_required_files() שהוגדרה למעלה
+is_required_files_exist, ab_groups_snp_path, snps_hg38_path, Msnps_hg19_path, yda_tree_path, yda_tree_version, yfull_tree_data = get_required_files()
+
+if not is_required_files_exist:
+    # תווית מידע
+    tk.Label(root, text="!!!!!!! required_files missing !!!!!!!!\n Connect to the internet and then load them through the menu", fg="blue", bg="yellow").grid(row=4, column=2, padx=5, pady=5)
 
 # זה מריץ כל הזמן את החלון הראשי שיהיה קיים תמיד
 root.mainloop()
