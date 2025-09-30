@@ -137,6 +137,7 @@ def update_required_files():
 
     # רשימת קבצים להורדה
     files_to_download = [
+        ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/y-dna-analyzer.py", "y-dna-analyzer.py"),
         ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/required_files/ab_groups_snp.csv", "ab_groups_snp.csv"),
         ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/required_files/yda_yfull_tree_version.txt", "yda_yfull_tree_version.txt"),
         ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/required_files/yda_yfull_tree.json", "yda_yfull_tree.json"),
