@@ -127,31 +127,36 @@ def update_required_files():
     files_to_download.append((yfull_tree_url, f"tree_{version}.zip"))
     '''
     # ממשג גרפי להצגת התקדמות ההורדה
-    jroot = Tk()
-    jroot.title("update_required_files")
-    jroot.attributes("-topmost", True) # מבטיח שהחלון יהיה מעל כל האחרים
-    progress_bar = ttk.Progressbar(jroot, length=200, maximum=len(files_to_download))
-    progress_bar.pack()
-    jroot.update()
+    global root
+    progress_bar = ttk.Progressbar(root, length=200, maximum=len(files_to_download))
+    progress_bar.grid(row=4, column=2, padx=5, pady=5)
+    root.update()
     
     # הורדה ושמירה
     failed_files = []
     for i, (url, filename) in enumerate(files_to_download, start=1):
         save_path = save_dir / filename
         try:
-            with urlopen(url) as response, open(save_path, "wb") as out_file:
-                out_file.write(response.read())
+            with urlopen(url) as response:
+                data = response.read()
+                # בודק שלא ייווצר קובץ אם הוא ריק ואין בו מידע כי לא הצליחו להוריד 
+                if not data:
+                    raise ValueError("Downloaded file is empty")
+                with open(save_path, "wb") as out_file:
+                    out_file.write(data)
         except Exception as e:
             failed_files.append(f"{filename} ({e})")
         progress_bar['value'] = i
-        jroot.update()
+        root.update()
 
     # הסרת החלון לאחר סיום ההורדה
-    jroot.destroy()
+    progress_bar.destroy()
 
     # הודעה על הצלחה/כשל והחזרת טרו במקרה של ל הצלחה ופאלס במקרה של כשלון
     if not failed_files:
-        messagebox.showinfo("Download Complete", "All files were downloaded successfully.")
+        messagebox.showinfo("Download Complete", "All files were downloaded successfully.\nThe software will now close, and you need to restart it.")
+        # הסרת החלון לאחר סיום ההורדה
+        root.destroy()
         return True
     else:
         messagebox.showerror("Download Failed", f"Failed to download:\n" + "\n".join(failed_files))
@@ -222,7 +227,7 @@ def get_required_files():
         # רק אם משתמשים בעץ שנמצא בתיקיית הנתונים (yda_dir_path in yda_tree_path) ויש גרסה עדכנית יותר באתר 
         if latest_tree_version and (yda_dir_path in yda_tree_path) and latest_tree_version != string_version:
             # מוסיפים סימני קריאה למספר הגרסה
-            _version += "( !!!)"
+            string_version += "( !!!)"
         ############################################################    
         # טוען את עץ וייפול לשימוש בתוכנה כולל מידע על הגרסה (file_path: Path, version: str | None = None) -> YTreeData
         yfull_tree_data = tree.yfull_tree_to_tree_data(Path(yda_tree_path), version=string_version)
@@ -235,26 +240,29 @@ def get_required_files():
                 # משתנים גלובליים עבור התוכנה
 ##########################################################################################################
 
-last_clades = [] # שומר את רשימת התוצאות שיוצאת מפונקציית run_calculate_clade לצורך שימוש עתידי
 last_positive_snp_string = "" # שומר את רשימת הווריאנטים החיוביים שבהם משתמשים לחישוב הקלייד ב run_calculate_clade
-last_ref_type = "" 
-reference_snps = {}      # pos -> ref_snp_name + ref_allele
-reference_names = {}      # id_snp_name -> pos
-user_snaps = {}          # pos -> ref_snp_name + ref_allele
-last_dna_file = ""
-last_reference_file = ""
-reference_loaded = False
-user_loaded = False
-last_dna_file_type = ""
-last_yfull_link = ""
-last_ftdna_link = ""
-last_ab_data = None
-last_dna_file_info = ""
+last_clades = [] # שומר את רשימת התוצאות שיוצאת מפונקציית run_calculate_clade לצורך שימוש עתידי
+last_yfull_link = "" # מחזיק את כתובת הקישור לעץ yfull למיקום הקלייד הסופי
+last_ftdna_link = "" # מחזיק את כתובת הקישור לעץ ftdna למיקום הקלייד הסופי
+
+reference_positions_dict = {}  # מילון ששומר את נתוני הרפרנס לפי מפתח מיקום גנומי 
+reference_names_dict = {}      # מילון רפרנס לפי מפתח שמות snp מחזיר מיקום גנומי מתאים
+
+user_loaded = False # משתנה ששומר האם יש קובץ דנא של נבדק-משתמש שנטען לתוכנה ומוכן לשימוש
+last_dna_file = "" # שומר את שם קובץ הדנ"א של המשתמש
+last_dna_file_info = "" # שומר נתוני מידע שונים על קובץ הדנא של המשתמש שמתקבלים מפונקציית detect_headlines
+
+reference_loaded = False # משתנה ששומר האם יש קובץ רפרנס שנטען לתוכנה ומוכן לשימוש
+last_reference_file = "" # שומר את שם קובץ הרפרנס 
+last_ref_file_info = "" # שומר נתוני מידע שונים על קובץ הרפרנס שמתקבלים מפונקציית detect_headlines
+
+last_ab_data = None # מחזיק את הנתונים עבור כל קבוצות אבותינו ותתי הענפים שלהם
+
 ########################################################################################################
 
 # פונקצייה לביטול טעינת קובץ הדנא של המשתמש וכל הנתונים שחושבו עליו
 def reset_user():
-    global last_clades, last_positive_snp_string, last_dna_file, user_loaded    
+    global last_clades, last_positive_snp_string, last_dna_file, last_dna_file_info, user_loaded    
     last_clades = []
     last_positive_snp_string = ""
     last_dna_file = ""
@@ -268,7 +276,6 @@ def reset_user():
     user_result_label.config(text="", bg="SystemButtonFace")
     btn_save_results.grid_forget()
     btn_unload_dna.grid_forget()
-    last_dna_file_type = ""
     last_dna_file_info = ""
     last_yfull_link = ""
     last_ftdna_link = ""
@@ -276,10 +283,11 @@ def reset_user():
 
 # פונקצייה לביטול טעינת קובץ הרפרנס    
 def unload_ref():
-    global reference_snps, reference_names, last_reference_file, reference_loaded
-    reference_snps = {}      # pos -> ref_snp_name + ref_allele
-    reference_names = {}      # id_snp_name -> pos
+    global reference_positions_dict, reference_names_dict, last_reference_file, last_ref_file_info, reference_loaded
+    reference_positions_dict = {}      
+    reference_names_dict = {}      
     last_reference_file = ""
+    last_ref_file_info = ""
     reference_loaded = False
     reference_loading_label.config(text="No reference_file loaded", fg="red")
     btn_unload_ref.grid_forget()
@@ -472,7 +480,7 @@ def detect_headlines(file_path):
 
 # פונקצייה לטעינת קובץ הרפרנס
 def load_reference(ref_path):
-    global reference_loaded, reference_snps, reference_names, last_reference_file, last_ref_type
+    global reference_loaded, reference_positions_dict, reference_names_dict, last_reference_file, last_ref_file_info
     
     if not ref_path:
         return
@@ -480,10 +488,10 @@ def load_reference(ref_path):
     reference_loading_label.config(text=f"Loading reference {os.path.basename(ref_path)} ...")
     root.update()
     
-    last_ref_type = detect_headlines(ref_path)["ref"]
-
-    reference_snps = {}
-    reference_names = {}
+    ref_file_info = detect_headlines(ref_path)
+    
+    # בדיקת או בחירת הרפרנס המתאים לקובץ הדנא של המשתמש
+    ref_type = ref_file_info["ref"]
     
     opener = gzip.open if ref_path.endswith(".gz") else open
     try:
@@ -507,17 +515,18 @@ def load_reference(ref_path):
                     continue
                 
                 # מוסיף את השורה למילון שמאונדקס לפי המיקום הגנומי
-                reference_snps[pos] = {"pos": pos, "name": snp_names, "ref": ref, "alt": alt}
+                reference_positions_dict[pos] = {"pos": pos, "name": snp_names, "ref": ref, "alt": alt}
                 
                 # לפצל את השמות לפי פסיק ולשמור כל שם בנפרד כמפתח במילון נוסף שמאונדקס לפי שמות
                 if snp_names != ".":
                     for snp_name in snp_names.split(","):
-                        #reference_names[snp_name] = {"pos": pos, "name": snp_name, "ref": ref, "alt": alt}
-                        reference_names[snp_name] = pos
+                        #reference_names_dict[snp_name] = {"pos": pos, "name": snp_name, "ref": ref, "alt": alt}
+                        reference_names_dict[snp_name] = pos
                         
         reference_loaded = True
-        reference_loading_label.config(fg="blue", text=f"Reference loaded: \nname: {os.path.basename(ref_path)}  \n Y-SNPs: {len(reference_snps)}  \ntype: {last_ref_type} \ndate: {detect_headlines(ref_path)['creation_date']}")
+        reference_loading_label.config(fg="blue", text=f"Reference loaded: \nname: {os.path.basename(ref_path)}  \n Y-SNPs: {len(reference_positions_dict)}  \ntype: {ref_type} \ndate: {ref_file_info['creation_date']}")
         last_reference_file = ref_path
+        last_ref_file_info = ref_file_info
         btn_unload_ref.grid(row=1, column=0, padx=5, pady=5)
         
         
@@ -540,10 +549,12 @@ def load_dna_file():
     if not file_path:
         return
     
-    dna_file_info = detect_headlines(file_path)
+    # בדיקה האם בקובץ יש מידע על הרפרנס שבו צריכים להשתמש עבורו ומידע נוסף
+    global last_dna_file_info
+    last_dna_file_info = detect_headlines(file_path)
     
     # בדיקת או בחירת הרפרנס המתאים לקובץ הדנא של המשתמש
-    ref_auto_detect = dna_file_info["ref"]
+    ref_auto_detect = last_dna_file_info["ref"]
     
     ref_path = Msnps_hg19_path if ref_auto_detect == "hg19" else snps_hg38_path if ref_auto_detect == "hg38" else None #@@@@@@@@@
     
@@ -562,7 +573,7 @@ def load_dna_file():
         load_reference(ref_path)
     
     # הצהרה על משתנים גלובליים הדרושים להלן
-    global last_clades, last_positive_snp_string, last_dna_file, user_snps, user_loaded, last_dna_file_type, last_dna_file_info
+    global last_clades, last_positive_snp_string, last_dna_file, user_snps, user_loaded
     
     # אם לא בחרו קובץ רפרנס מאפסים הכל ולא ממשיכים
     if not reference_loaded:
@@ -572,8 +583,6 @@ def load_dna_file():
     last_clades = []
     last_positive_snp_string = ""
     last_dna_file = file_path
-    last_dna_file_type = ref_auto_detect
-    last_dna_file_info = dna_file_info
 
     dna_loading_label.config(text=f"Loading {os.path.basename(file_path)} ...")
     root.update()
@@ -659,7 +668,7 @@ def load_dna_file():
                     continue
                 
                 # המיקום הזה בקובץ של מייהירטייג הוא תמיד חיובי לכולם ולכן להוסיף אחריו סימני שאלה וזה גם גורם שחישוב ענף וויפול לא יבוצע על פיו
-                if dna_file_info["creator"] == "myheritage" and rsid == "rs570569843":
+                if last_dna_file_info["creator"] == "myheritage" and rsid == "rs570569843":
                     allele_str += "???" # או פשוט לדלג על השורה באמצעות: continue
                  
                 # הוספת השורה למילון המשתמש לאחר שוודאנו שמובר בשורה של Y
@@ -668,7 +677,7 @@ def load_dna_file():
                 # בדיקה מול הרפרנס
                 if not pos_str.isdigit():
                     continue
-                ref_info = reference_snps.get(int(pos_str))
+                ref_info = reference_positions_dict.get(int(pos_str))
                 if not ref_info:
                     continue
 
@@ -684,7 +693,7 @@ def load_dna_file():
         last_positive_snp_string = ", ".join(positive_snps)
         #print("Final positive SNPs:", last_positive_snp_string)
 
-        dna_loading_label.config(fg="blue", text=f"DNA file loaded: \nname: {os.path.basename(file_path)} \n{len(user_snps)} total Y-rows  \n{len(positive_snps)} Positive Y-SNPs in DNA_file  \ntype: {last_dna_file_type}")
+        dna_loading_label.config(fg="blue", text=f"DNA file loaded: \nname: {os.path.basename(file_path)} \n{len(user_snps)} total Y-rows  \n{len(positive_snps)} Positive Y-SNPs in DNA_file  \nref type: {ref_auto_detect}")
         user_loaded = True
         
         if len(positive_snps) >= 100:
@@ -811,7 +820,7 @@ def run_calculate_clade(Final_clade_index = 0):
     # דבר ראשון קוראים לפונקצייה שמקימה את מערך המידע על קבוצות אבותינו
     get_ab_data()
     
-    global last_positive_snp_string, last_clades, last_reference_file, ref_user_file, last_dna_file_type, last_ref_type, last_ab_data, last_dna_file_info
+    global last_positive_snp_string, last_clades, last_reference_file, last_ab_data, last_dna_file_info, last_ref_file_info
     result_var.set("") # תמיד לאפס קודם ולרוקן את הכיתוב הישן
     if not last_positive_snp_string:
         result_var.set("No matching SNPs were found in the file")
@@ -884,7 +893,7 @@ def run_calculate_clade(Final_clade_index = 0):
         # הצגת התוצאה במסך
         result_var.set(
             f"run for:     {'User DNA-file' if user_loaded else 'check Y-SNP button'}\n"
-            f"YFull predicted clade (used ref {last_ref_type}):\n"
+            f"YFull predicted clade (used ref {last_ref_file_info['ref']}):\n"
             f"yfull tree version: {yfull_tree_data.version}\n"
             f" Name:    {name}\n"
             f" TMRCA:   {tmrca} ybp\n"
@@ -969,7 +978,7 @@ def save_clades_to_file():
 # פונקצייה לבדיקת שם סניפ או מיקום גנומי בנתוני המשתמש וברפרנס ומה הענף המתאים בוויפול ובאבותינו לווריאנט המבוקש     
 def check_search_input(ref_search = True):
     
-    global reference_names, reference_snaps, user_snps, user_loaded, reference_loaded, last_positive_snp_string
+    global reference_names_dict, reference_snaps, user_snps, user_loaded, reference_loaded, last_positive_snp_string
     
     # טוענים רפרנס לפי בחירת המשתמש אם עיין לא נטען
     if not reference_loaded:
@@ -986,12 +995,12 @@ def check_search_input(ref_search = True):
     # אם הקליד מספר זה מיקום גנומי ובודקים ברפרנס ובנתוני המשתמש מה כתוב בשורה המתאימה למיקום גנומי זה
     if search_input.isdigit():
         pos = int(search_input)
-        fields_reference = reference_snps.get(pos)
+        fields_reference = reference_positions_dict.get(pos)
         fields_user = user_snps.get(pos) if user_loaded else False
     # אם זה לא מספר אז מניחים שזה שם ווראינט ומחפשים אותו במילון של שמות הווראינטים שברפרנס
     else:  
-        pos = reference_names.get(search_input)
-        fields_reference = reference_snps.get(pos)
+        pos = reference_names_dict.get(search_input)
+        fields_reference = reference_positions_dict.get(pos)
         fields_user = user_snps.get(pos) if user_loaded else False
     
     # אם יש תוצאות מהרפרנס למיקום גנומי זה מציגים אותם בעמודת הרפרנס
@@ -1037,7 +1046,7 @@ root = tk.Tk()
 #root.minsize(500, 500)
 
 # כותרת לחלון
-root.title("y-dna-analyzer | by Dr. simcha-gershon Bohrer (PhD.) | versin: 28 sep 2025")
+root.title("Y-DNA-Analyzer | by Dr. simcha-gershon Bohrer (PhD.) | versin date: 30 sep 2025")
 
 # מפרידים אנכיים בין העמודות
 ttk.Separator(root, orient="vertical").grid(row=0, column=1, sticky="ns", padx=5, rowspan=20)
@@ -1049,10 +1058,10 @@ tk.Label(root, text="Yclade", font="david 14 bold").grid(row=0, column=2, padx=7
 tk.Label(root, text="User DNA file", font="david 14 bold").grid(row=0, column=4, padx=75, pady=10)
 
 # כפתור לביטול טעינת קובץ הרפרנס # המיקום גריד שלו מתבצע בפונקציית טעינת הרפרנס
-btn_unload_ref = tk.Button(root, text="unload_ref_file", command=unload_ref)
+btn_unload_ref = tk.Button(root, text="unload ref file", command=unload_ref)
 
 # כפתור לביטול טעינת קובץ דנא של המשתמש # המיקום גריד שלו מתבצע בפונקציית טעינת קובץ דנא של המשתמש
-btn_unload_dna = tk.Button(root, text="unload_dna_file", command=reset_user)
+btn_unload_dna = tk.Button(root, text="unload dna file", command=reset_user)
 
 # כפתור לבחירת קובץ הדנא של המשתמש
 btn_csv = tk.Button(root, text="Choose \nUser RAW-DNA File \nvcf/vcf.gz/txt/csv/gz/zip", command=load_dna_file)
@@ -1116,13 +1125,13 @@ tk.Label(root, text="NOTE: Each reference has different positions").grid(row=15,
 ########################################################################################
 
 # תפריט לחצנים נוספים לאפשרויות נוספות
-mb=  Menubutton ( root, text= "Info & Options", relief=RAISED ,bg="gray87")
+mb=  Menubutton ( root, text= "Menu: Info & Options", relief=RAISED ,bg="gray87")
 mb.grid(column=4, row=12)
 mb.menu =  Menu ( mb, tearoff = 0 )
 mb["menu"] =  mb.menu
 mb.menu.add_command ( label= "Information", command= show_information)
 mb.menu.add_command ( label= "open yda dir", command= lambda: subprocess.run(["explorer" if is_windows else "xdg-open", str(yda_dir_path)]))
-mb.menu.add_command ( label= "update required files", command= update_required_files)
+mb.menu.add_command ( label= "Download/Update required files", command= update_required_files)
 
 '''
 # אם רוצים תפריט רגיל בחלק העליון של המסך
@@ -1139,7 +1148,7 @@ is_required_files_exist, ab_groups_snp_path, snps_hg38_path, Msnps_hg19_path, yd
 
 if not is_required_files_exist:
     # תווית מידע
-    tk.Label(root, text="!!!!!!! required_files missing !!!!!!!!\n Connect to the internet and then load them through the menu", fg="blue", bg="yellow").grid(row=4, column=2, padx=5, pady=5)
+    tk.Label(root, text="!!!!!!! Required files are missing !!!!!!!!\nThe software is useless without these files\nconnect to the internet and download them from the menu", fg="blue", bg="yellow").grid(row=4, column=2, padx=5, pady=5)
 
 # זה מריץ כל הזמן את החלון הראשי שיהיה קיים תמיד
 root.mainloop()
