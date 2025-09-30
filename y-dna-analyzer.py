@@ -137,10 +137,10 @@ def update_required_files():
 
     # רשימת קבצים להורדה
     files_to_download = [
-        ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/ab_groups_snp.csv", "ab_groups_snp.csv"),
-        ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/Msnps_hg19.vcf.gz", "Msnps_hg19.vcf.gz"),
-        ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/yda_yfull_tree.json", "yda_yfull_tree.json"),
-        ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/yda_yfull_tree_version.txt", "yda_yfull_tree_version.txt"),
+        ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/required_files/ab_groups_snp.csv", "ab_groups_snp.csv"),
+        ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/required_files/yda_yfull_tree_version.txt", "yda_yfull_tree_version.txt"),
+        ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/required_files/yda_yfull_tree.json", "yda_yfull_tree.json"),
+        ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/required_files/Msnps_hg19.vcf.gz", "Msnps_hg19.vcf.gz"),
         ("https://ybrowse.org/gbrowse2/gff/snps_hg38.vcf.gz", "snps_hg38.vcf.gz"),
     ]
     '''
