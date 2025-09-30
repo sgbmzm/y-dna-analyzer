@@ -26,9 +26,34 @@ is_windows = platform.system() == "Windows"
 ##########################################################################
 # תוכן המידע על התוכנה
 INFORMATION = '''
+This project is hosted here:
+https://github.com/sgbmzm/y-dna-analyzer/tree/main
+
 This software analyzes raw DNA files.
-Provides information on the Y chromosome only.
-More information to come later
+Such as files from the testing companies Ancestry, 23andME, MyHeritage, FTDNA, as well as BIG-Y VCF files or whole genome WGS.
+From the above files, only the lines dealing with the Y chromosome are read. Everything else is skipped.
+
+This software has two modes of operation:
+1. With raw DNA file: Used to find the appropriate branch on the yfull tree for the raw DNA file, and also used to manually check whether a particular variant is positive or negative in the subject using the search box, by searching by SNP name or by genomic position.
+The raw DNA files can be loaded into the software as they come from the testing company, even without extraction.
+
+2. Without raw DNA file: Used to search for information on a specific variant on the Y chromosome, using the search box, by searching by SNP name or by genomic position, and also to find the appropriate branch on the yfull tree for the specific variant typed in the search box. This mode is only possible when no user DNA file is loaded.
+All modes of operation require loading an appropriate reference file, HG19 or HG38. The appropriate reference for a raw DNA file is usually identified automatically. If not automatically detected, and in the case of no raw DNA file, the user must select which reference to load.
+
+Note: The genomic position is different between the two references for each variant.
+
+The HG38 reference file is updated every day with new variant names.
+You can re-download and update all files needed for the software, including the references, through the menu.
+
+The Yclade column also contains information for the "Avotaynu" branch, i.e. the AB where the corresponding branch is located, or information about ABs that are below the corresponding branch in the case that the corresponding branch is an ancient branch.
+If (A) appears next to AB, this means that there are Ashkenazim in this branch (but maybe others too).
+
+The information about AB is not always accurate for two reasons:
+1. Only for some of the ABs is it known which branch they are on in the tree.
+2. Sometimes there is an error in the database for the corresponding branch. I try to check and update the information so that it is more accurate. The database can be updated - along with all the other files - through the menu.
+All information about the ABs is here:
+https://jewishdna.net/index.html
+
 '''
 
 # פונקצייה להצגת המידע על התוכנה
@@ -485,7 +510,7 @@ def load_reference(ref_path):
     if not ref_path:
         return
     
-    reference_loading_label.config(text=f"Loading reference {os.path.basename(ref_path)} ...")
+    reference_loading_label.config(text=f"Loading reference {os.path.basename(ref_path)} ...", fg="green")
     root.update()
     
     ref_file_info = detect_headlines(ref_path)
@@ -568,7 +593,8 @@ def load_dna_file():
     if not last_reference_file == ref_path:
         reference_loaded = False
     
-    if not reference_loaded:    
+    if not reference_loaded:
+        dna_loading_label.config(text="Loading reference for this file ...", fg="green")
         # טעינת הרפרנס הנבחר    
         load_reference(ref_path)
     
