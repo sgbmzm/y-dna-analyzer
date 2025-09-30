@@ -299,7 +299,7 @@ def reset_user():
     btn_yfull.grid_forget()
     btn_ftdna.grid_forget()
     dna_loading_label.config(text="No DNA_file loaded", fg="red")
-    yclade_label.config(text="load user DNA file", fg="red")
+    yclade_label.config(text="Check SNP or load DNA-file", fg="red")
     user_result_var.set("")
     user_result_label.config(text="", bg="SystemButtonFace")
     btn_save_results.grid_forget()
@@ -597,7 +597,8 @@ def load_dna_file():
         reference_loaded = False
     
     if not reference_loaded:
-        dna_loading_label.config(text="Loading reference for this file ...", fg="green")
+        dna_loading_label.config(text="Waiting for Loading reference for this file ...", fg="green")
+        yclade_label.config(text="Waiting for Loading reference & DNA-file ...", fg="green")
         # טעינת הרפרנס הנבחר    
         load_reference(ref_path)
     
@@ -857,7 +858,7 @@ def run_calculate_clade(Final_clade_index = 0):
         return
 
     try:
-        yclade_label.config(text="Running clade calculation...")
+        yclade_label.config(text="Running clade calculation...", fg="green")
         root.update()
 
         # קריאה ל־yclade עם מחרוזת אחת
@@ -1009,11 +1010,13 @@ def check_search_input(ref_search = True):
     
     global reference_names_dict, reference_snaps, user_snps, user_loaded, reference_loaded, last_positive_snp_string
     
-    # טוענים רפרנס לפי בחירת המשתמש אם עיין לא נטען
+    # טוענים רפרנס לפי בחירת המשתמש אם עדיין לא נטען
     if not reference_loaded:
         choice = messagebox.askyesnocancel("Reference not Autodetected", "Autodetected Reference faild\nChoose hg19, hg38, or None.\n\nYes = hg19, No = hg38, Cancel = None")
-        ref_path = Msnps_hg19_path if choice else snps_hg38_path if (choice == False) else False #@@@@@@@@@    
+        ref_path = Msnps_hg19_path if choice else snps_hg38_path if (choice == False) else False #@@@@@@@@@
+        yclade_label.config(text="Waiting for Loading reference ...", fg="green")
         load_reference(ref_path)
+        yclade_label.config(text="Check SNP or load DNA-file", fg="red")
         
     if not reference_loaded:
         return
@@ -1228,6 +1231,7 @@ root.mainloop()
 # כרומוזום Y נקרא בקובץ:   Y
 
 # מייהירטייג: כתוב שם החברה, כתוב רפרנס 
+
 
 
 
