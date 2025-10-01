@@ -20,6 +20,9 @@ import json
 from yclade import tree, snps, find, const
 import networkx as nx
 
+# משתנה ששומר את תאריך הגרסה של התוכנה עבור הדפסה בשורת הכותרת של התוכנה
+yda_version_date = "01 Oct 2025"
+
 # משתנה מאוד חשוב שקובע האם מערכת ההפעלה הנוכחית היא ווינדוס כי אם היא לא אז אי אפשר לעשות חלק מהפעולות
 is_windows = platform.system() == "Windows"
 
@@ -101,7 +104,7 @@ def get_latest_yfull_tree_version() -> str:
         with urlopen(url) as resp:
             return resp.read().decode("utf-8").strip()
     except Exception as e:
-        print(f"שגיאה בקריאת גרסת העץ העדכנית: {e}")
+        print(f"get_latest_yfull_tree_version Eror: {e}")
         return None  # ערך ברירת מחדל
 
 ######################################################################################################
@@ -182,12 +185,12 @@ def update_required_files():
 
     # הודעה על הצלחה/כשל והחזרת טרו במקרה של ל הצלחה ופאלס במקרה של כשלון
     if not failed_files:
-        messagebox.showinfo("Download Complete", "All files were downloaded successfully.\nThe software will now close, and you need to restart it.")
+        messagebox.showinfo("Download required_files Complete", "All files were downloaded successfully.\nThe software will now close, and you need to restart it.")
         # הסרת החלון לאחר סיום ההורדה
         root.destroy()
         return True
     else:
-        messagebox.showerror("Download Failed", f"Failed to download:\n" + "\n".join(failed_files))
+        messagebox.showerror("Download required_files Failed", f"Failed to download:\n" + "\n".join(failed_files))
         return False
 
 # פונקצייה חשובה מאוד שטוענת את כל הקבצים הדרושים לפעילות התוכנה ומחזירה את המשתנים הדרושים 
@@ -276,6 +279,8 @@ last_ftdna_link = "" # מחזיק את כתובת הקישור לעץ ftdna למ
 reference_positions_dict = {}  # מילון ששומר את נתוני הרפרנס לפי מפתח מיקום גנומי 
 reference_names_dict = {}      # מילון רפרנס לפי מפתח שמות snp מחזיר מיקום גנומי מתאים
 
+user_snps_dict = {} # מילון ששומר את כל הווריאנטים של המשתמש מתוך קובץ הדנ"א שלו כשהמפתח הוא המיקום הגנומי לפי הרפרנס המתאים או הנבחר
+
 user_loaded = False # משתנה ששומר האם יש קובץ דנא של נבדק-משתמש שנטען לתוכנה ומוכן לשימוש
 last_dna_file = "" # שומר את שם קובץ הדנ"א של המשתמש
 last_dna_file_info = "" # שומר נתוני מידע שונים על קובץ הדנא של המשתמש שמתקבלים מפונקציית detect_headlines
@@ -292,6 +297,7 @@ last_ab_data = None # מחזיק את הנתונים עבור כל קבוצות 
 def reset_user():
     global last_clades, last_positive_snp_string, last_dna_file, last_dna_file_info, user_loaded    
     last_clades = []
+    user_snps_dict = {}
     last_positive_snp_string = ""
     last_dna_file = ""
     user_loaded = False
@@ -542,10 +548,22 @@ def load_reference(ref_path):
                 if chrom_norm != "y":
                     continue
                 
-                # מוסיף את השורה למילון שמאונדקס לפי המיקום הגנומי
-                reference_positions_dict[pos] = {"pos": pos, "name": snp_names, "ref": ref, "alt": alt}
+                # אם המיקום עדיין לא קיים במילון – צור רשימה חדשה שתכיל את כל הווריאנטים הקיימים עבור המיקום הגנומי הזה
+                # צריך רשימה כי יש לפעמים שבמיקום גנומי אחד יש כמה ווריאנטים
+                # אם כבר יש רשימה עבור המיקום הגומי הזה אז לא יוצרים רשימה אלא רק מוסיפים ערך לרשימה הקיימת
+                if pos not in reference_positions_dict:
+                    reference_positions_dict[pos] = []
+                
+                # הוסף את הווריאנט לרשימה של אותו מיקום
+                reference_positions_dict[pos].append({
+                    "pos": pos,
+                    "name": snp_names,
+                    "ref": ref,
+                    "alt": alt
+                })
                 
                 # לפצל את השמות לפי פסיק ולשמור כל שם בנפרד כמפתח במילון נוסף שמאונדקס לפי שמות
+                # לשמות לא צריך רשימה כי כל שם מוביל בהכרח למיקום גנומי יחיד.
                 if snp_names != ".":
                     for snp_name in snp_names.split(","):
                         #reference_names_dict[snp_name] = {"pos": pos, "name": snp_name, "ref": ref, "alt": alt}
@@ -559,12 +577,12 @@ def load_reference(ref_path):
         
         
     except Exception as e:
-        messagebox.showerror("Error", f"Failed to load reference: {e}")
+        messagebox.showerror("load_reference Error", f"Failed to load reference: {e}")
         #reference_loading_label.config(text="")
         
 
 # פונקצייה לטעינת קובץ הדנא של המשתמש מסוגים שונים ומחברות בדיקה שונות     
-def load_dna_file():
+def load_user_dna_file():
     
     # כל פעם כשבוחרים קובץ דנא חדש הכל מתאפס ומחושב מהתחלה
     reset_user()
@@ -587,8 +605,8 @@ def load_dna_file():
     ref_path = Msnps_hg19_path if ref_auto_detect == "hg19" else snps_hg38_path if ref_auto_detect == "hg38" else None #@@@@@@@@@
     
     if not ref_auto_detect:
-        choice = messagebox.askyesnocancel("Reference not Autodetected", "Autodetected Reference faild\nChoose hg19, hg38, or None.\n\nYes = hg19, No = hg38, Cancel = None")
-        ref_path = Msnps_hg19_path if choice else snps_hg38_path if (choice == False) else None #@@@@@@@@@
+        choice = messagebox.askyesnocancel("Reference not Autodetected", "Autodetected Reference faild\nChoose hg19, hg38, or None.\n\nYes = hg38, No = hg19, Cancel = None")
+        ref_path = snps_hg38_path if choice else Msnps_hg19_path if (choice == False) else None #@@@@@@@@@
     
     global last_reference_file, reference_loaded
     
@@ -603,7 +621,7 @@ def load_dna_file():
         load_reference(ref_path)
     
     # הצהרה על משתנים גלובליים הדרושים להלן
-    global last_clades, last_positive_snp_string, last_dna_file, user_snps, user_loaded
+    global last_clades, last_positive_snp_string, last_dna_file, user_snps_dict, user_loaded
     
     # אם לא בחרו קובץ רפרנס מאפסים הכל ולא ממשיכים
     if not reference_loaded:
@@ -618,7 +636,7 @@ def load_dna_file():
     root.update()
 
     positive_snps = []
-    user_snps = {}
+    user_snps_dict = {}
           
     ##########################################################################################################
     # זה מטפל במקרה מיוחד של ביג Y של פטדנא שהוא בזיפ רגיל אבל הוא VCF
@@ -702,7 +720,7 @@ def load_dna_file():
                     allele_str += "???" # או פשוט לדלג על השורה באמצעות: continue
                  
                 # הוספת השורה למילון המשתמש לאחר שוודאנו שמובר בשורה של Y
-                user_snps[int(pos_str)] = {"chrom": chrom, "pos_str": pos_str, "ref": ref_auto_detect, "snp_name": "?", "allele": allele_str, "is_positive": "?", "ad-R/A": ad_str}
+                user_snps_dict[int(pos_str)] = {"chrom": chrom, "pos_str": pos_str, "ref": ref_auto_detect, "snp_name": "?", "allele": allele_str, "is_positive": "?", "ad-R/A": ad_str}
                 
                 # בדיקה מול הרפרנס
                 if not pos_str.isdigit():
@@ -714,16 +732,16 @@ def load_dna_file():
                 if allele_str == ref_info["alt"]:
                     s = f"{ref_info['name']}+"
                     positive_snps.append(s)
-                    user_snps[int(pos_str)]["is_positive"] = "Yes"   # או "כן" / "+" או כל מה שאתה רוצה
-                    user_snps[int(pos_str)]["snp_name"] = ref_info['name']
+                    user_snps_dict[int(pos_str)]["is_positive"] = "Yes"   # או "כן" / "+" או כל מה שאתה רוצה
+                    user_snps_dict[int(pos_str)]["snp_name"] = ref_info['name']
                 elif allele_str == ref_info["ref"] or allele_str == ".":
-                    user_snps[int(pos_str)]["is_positive"] = "No"
-                    user_snps[int(pos_str)]["snp_name"] = ref_info['name']
+                    user_snps_dict[int(pos_str)]["is_positive"] = "No"
+                    user_snps_dict[int(pos_str)]["snp_name"] = ref_info['name']
 
         last_positive_snp_string = ", ".join(positive_snps)
         #print("Final positive SNPs:", last_positive_snp_string)
 
-        dna_loading_label.config(fg="blue", text=f"DNA file loaded: \nname: {os.path.basename(file_path)} \n{len(user_snps)} total Y-rows  \n{len(positive_snps)} Positive Y-SNPs in DNA_file  \nref type: {ref_auto_detect}")
+        dna_loading_label.config(fg="blue", text=f"DNA file loaded: \nname: {os.path.basename(file_path)} \n{len(user_snps_dict)} total Y-rows  \n{len(positive_snps)} Positive Y-SNPs in DNA_file  \nref type: {ref_auto_detect}")
         user_loaded = True
         
         if len(positive_snps) >= 100:
@@ -735,7 +753,7 @@ def load_dna_file():
         btn_unload_dna.grid(row=1, column=4, padx=5, pady=5)
 
     except Exception as e:
-        messagebox.showerror("Error", f"Failed reading file: {e}")
+        messagebox.showerror("load_user_dna_file Error", f"Failed reading file: {e}")
         dna_loading_label.config(text="")
 
 
@@ -866,7 +884,7 @@ def run_calculate_clade(Final_clade_index = 0):
             clades = yda_find_clade(last_positive_snp_string)
                             
         except Exception as e:
-            messagebox.showerror("Error", f"find_clade failed: {e}")
+            messagebox.showerror("yda_find_clade in run_calculate_clade Error", f"find_clade failed: {e}")
             yclade_label.config(text="")
             return
         
@@ -941,7 +959,7 @@ def run_calculate_clade(Final_clade_index = 0):
         # במקרה שיש יותר מענף אחד בציון הכי גבוה נותנת אופצייה להתקדם למיקום הבא ברשימת התוצאות
         if len(clades) >= 2 and clades[Final_clade_index].score == clades[(Final_clade_index+1)].score:
             yclade_label.config(text=more_result_warning, fg="red")
-            if messagebox.askyesno("Warning", "There is more than one top-scoring clade.\nDo you want to see the next one?"):
+            if messagebox.askyesno("Yclade Warning", "There is more than one top-scoring clade.\nDo you want to see the next one?"):
                 return run_calculate_clade(Final_clade_index = (Final_clade_index+1) % len(clades))
         '''
         # זו צורה נוספת שבודקת רק את המיקום האחרון והבא אחריו, וההודעה קובץ כל פעם מהמיקום האחרון לזה שאחריו וחוזר חלילה    
@@ -963,12 +981,12 @@ def run_calculate_clade(Final_clade_index = 0):
         ''' 
         
     except Exception as e:
-        messagebox.showerror("Error", str(e))
+        messagebox.showerror("run_calculate_clade Error", str(e))
         
 # פונקצייה לשמירת התוצאות המלאות של חישוב הענפים החיוביים מ run_calculate_clade
 def save_clades_to_file():
     if not last_clades:
-        messagebox.showerror("Error", "No Clades to save.")
+        messagebox.showerror("save_clades_to_file Error", "No Clades to save.")
         return
     file_path = filedialog.asksaveasfilename(
         initialfile=f"{os.path.basename(last_dna_file)}.yclade_results.txt",
@@ -1002,20 +1020,23 @@ def save_clades_to_file():
 
         messagebox.showinfo("Success", f"Results saved to {file_path}")
     except Exception as e:
-        messagebox.showerror("Error", f"Failed to save file: {e}")
+        messagebox.showerror("save_clades_to_file Error", f"Failed to save file: {e}")
 
 # ------------------------
 # פונקצייה לבדיקת שם סניפ או מיקום גנומי בנתוני המשתמש וברפרנס ומה הענף המתאים בוויפול ובאבותינו לווריאנט המבוקש     
 def check_search_input(ref_search = True):
     
-    global reference_names_dict, reference_snaps, user_snps, user_loaded, reference_loaded, last_positive_snp_string
+    # הצהרה על משתנים גלובליים.
+    # צריך לזכור שreference_positions_dict מכיל רשימה (הכוללת מילון אחד או יותר) עבור כל מיקום גנומי כי לפעמים יש כמה ווריאנטים במיקום גנומי אחד
+    # שאר המילונים מכילים ערך מילוני רגיל ולא רשימה
+    global reference_positions_dict, reference_names_dict, user_snps_dict, user_loaded, reference_loaded, last_positive_snp_string
     
     # טוענים רפרנס לפי בחירת המשתמש אם עדיין לא נטען
     if not reference_loaded:
-        choice = messagebox.askyesnocancel("Reference not Autodetected", "Autodetected Reference faild\nChoose hg19, hg38, or None.\n\nYes = hg19, No = hg38, Cancel = None")
-        ref_path = Msnps_hg19_path if choice else snps_hg38_path if (choice == False) else False #@@@@@@@@@
+        choice = messagebox.askyesnocancel("Reference not Autodetected", "Autodetected Reference faild\nChoose hg19, hg38, or None.\n\nYes = hg38, No = hg19, Cancel = None")
+        ref_path = snps_hg38_path if choice else Msnps_hg19_path if (choice == False) else None #@@@@@@@@@
         yclade_label.config(text="Waiting for Loading reference ...", fg="green")
-        load_reference(ref_path)
+        load_reference(ref_path) # טוען את קובץ הרפרנס שנבחר
         yclade_label.config(text="Check SNP or load DNA-file", fg="red")
         
     if not reference_loaded:
@@ -1028,16 +1049,18 @@ def check_search_input(ref_search = True):
     if search_input.isdigit():
         pos = int(search_input)
         fields_reference = reference_positions_dict.get(pos)
-        fields_user = user_snps.get(pos) if user_loaded else False
+        fields_user = user_snps_dict.get(pos) if user_loaded else False
     # אם זה לא מספר אז מניחים שזה שם ווראינט ומחפשים אותו במילון של שמות הווראינטים שברפרנס
     else:  
         pos = reference_names_dict.get(search_input)
         fields_reference = reference_positions_dict.get(pos)
-        fields_user = user_snps.get(pos) if user_loaded else False
+        fields_user = user_snps_dict.get(pos) if user_loaded else False
     
     # אם יש תוצאות מהרפרנס למיקום גנומי זה מציגים אותם בעמודת הרפרנס
     if fields_reference:
-        ref_result_var.set(fields_reference)
+        # אם יש כמה ווריאנטים לאותו מיקום גנומי זה יציג כל אחד בשורה נפרדת
+        fields_reference_for_result_var = "\n".join(str(item) for item in fields_reference)
+        ref_result_var.set(fields_reference_for_result_var)
         ref_result_label.config(fg="green", bg="SystemButtonFace")
     else:
         ref_result_var.set(f"{search_input} not found in reference file")
@@ -1055,7 +1078,8 @@ def check_search_input(ref_search = True):
         
     # רק במקרה שלא טענו קובץ דנא של נבדק אז מריצים את חישוב המיקום על עץ ווייפול עבור הווריאנט המבוקש כאילו שהוא חיובי כולל בדיקת קבוצת אבותינו המתאימה
     if not user_loaded and fields_reference:
-        last_positive_snp_string = f"{fields_reference['name']}+"
+        # זה מטפל גם במקרים שעבור המיקום הגנומי שהוזן יש כמה ווריאנטים
+        last_positive_snp_string = ", ".join(f"{item['name']}+" for item in fields_reference)
         run_calculate_clade()
         
         
@@ -1078,7 +1102,7 @@ root = tk.Tk()
 #root.minsize(500, 500)
 
 # כותרת לחלון
-root.title("Y-DNA-Analyzer | by Dr. simcha-gershon Bohrer (PhD.) | versin date: 30 sep 2025")
+root.title(f"Y-DNA-Analyzer | by Dr. simcha-gershon Bohrer (PhD.) | versin date: {yda_version_date}")
 
 # מפרידים אנכיים בין העמודות
 ttk.Separator(root, orient="vertical").grid(row=0, column=1, sticky="ns", padx=5, rowspan=20)
@@ -1096,7 +1120,7 @@ btn_unload_ref = tk.Button(root, text="unload ref file", command=unload_ref)
 btn_unload_dna = tk.Button(root, text="unload dna file", command=reset_user)
 
 # כפתור לבחירת קובץ הדנא של המשתמש
-btn_csv = tk.Button(root, text="Choose \nUser RAW-DNA File \nvcf/vcf.gz/txt/csv/gz/zip", command=load_dna_file)
+btn_csv = tk.Button(root, text="Choose \nUser RAW-DNA File \nvcf/vcf.gz/txt/csv/gz/zip", command=load_user_dna_file)
 btn_csv.grid(row=1, column=4, rowspan=2)
 
 # תווית מידע על קובץ הרפרנס
@@ -1231,6 +1255,7 @@ root.mainloop()
 # כרומוזום Y נקרא בקובץ:   Y
 
 # מייהירטייג: כתוב שם החברה, כתוב רפרנס 
+
 
 
 
