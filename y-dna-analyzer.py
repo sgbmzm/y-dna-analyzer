@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import *
 from tkinter import filedialog, messagebox, ttk
 from platformdirs import user_data_dir
+import traceback # ללכוד את כל השגיאות באופן מפורט 
 import csv
 import os
 import re
@@ -725,9 +726,18 @@ def load_user_dna_file():
                 # בדיקה מול הרפרנס
                 if not pos_str.isdigit():
                     continue
-                ref_info = reference_positions_dict.get(int(pos_str))
-                if not ref_info:
+                
+                # זה בודק האם יש מפתח מיקום גנומי כזה במילון הרפרנס ומחזיר רשימה של מילון אחד או יותר עבור מיקום גנומי זה
+                # לפעמים יש למיקום גנומי אחד כמה ווריאנטים ואז מקבלים רשימה עם כמה איברים
+                # אם יש רק ווריאנט אחד למיקום גנומי זה מקבלים רשימה עם איבר אחד
+                ref_infos = reference_positions_dict.get(int(pos_str))
+                
+                if not ref_infos:
                     continue
+                ####@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+                # לוקחים רק את המילון הראשון ברשימת המילונים על מיקום גנומי זה אבל זה לא בסדר כי צריך לבדוק לכל מילון ומילון
+                ref_info = ref_infos[0]
+                ####@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
                 if allele_str == ref_info["alt"]:
                     s = f"{ref_info['name']}+"
@@ -753,8 +763,11 @@ def load_user_dna_file():
         btn_unload_dna.grid(row=1, column=4, padx=5, pady=5)
 
     except Exception as e:
-        messagebox.showerror("load_user_dna_file Error", f"Failed reading file: {e}")
+        tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
+        print(tb_str)
+        messagebox.showerror("load_user_dna_file Error", f"Failed reading file: {tb_str}")
         dna_loading_label.config(text="")
+        yclade_label.config(text="Check SNP or load DNA-file", fg="red")
 
 
 # פונקציה שטוענת מקובץ את הנתונים על קבוצות אבותינו וענפי הצאצאים שלהם ויכולה גם לשמור לקובץ
@@ -956,11 +969,21 @@ def run_calculate_clade(Final_clade_index = 0):
          
         yclade_label.config(text="Analysis finished successfully.", fg="blue")
         
+        
+        # בדיקה בטוחה עם wrap-around
+        next_index = (Final_clade_index + 1) % len(clades)
+        if len(clades) >= 2 and clades[Final_clade_index].score == clades[next_index].score:
+            yclade_label.config(text=more_result_warning, fg="red")
+            if messagebox.askyesno("Yclade Warning", "There is more than one top-scoring clade.\nDo you want to see the next one?"):
+                return run_calculate_clade(Final_clade_index=next_index)
+
+        '''
         # במקרה שיש יותר מענף אחד בציון הכי גבוה נותנת אופצייה להתקדם למיקום הבא ברשימת התוצאות
         if len(clades) >= 2 and clades[Final_clade_index].score == clades[(Final_clade_index+1)].score:
             yclade_label.config(text=more_result_warning, fg="red")
             if messagebox.askyesno("Yclade Warning", "There is more than one top-scoring clade.\nDo you want to see the next one?"):
                 return run_calculate_clade(Final_clade_index = (Final_clade_index+1) % len(clades))
+        '''
         '''
         # זו צורה נוספת שבודקת רק את המיקום האחרון והבא אחריו, וההודעה קובץ כל פעם מהמיקום האחרון לזה שאחריו וחוזר חלילה    
         if len(clades) >= 2 and clades[0].score == clades[(1)].score:
@@ -1078,8 +1101,12 @@ def check_search_input(ref_search = True):
         
     # רק במקרה שלא טענו קובץ דנא של נבדק אז מריצים את חישוב המיקום על עץ ווייפול עבור הווריאנט המבוקש כאילו שהוא חיובי כולל בדיקת קבוצת אבותינו המתאימה
     if not user_loaded and fields_reference:
-        # זה מטפל גם במקרים שעבור המיקום הגנומי שהוזן יש כמה ווריאנטים
-        last_positive_snp_string = ", ".join(f"{item['name']}+" for item in fields_reference)
+        # במקרה שבחיפוש הוזן מספר אז מדובר במיקום גנומי וייתכן שיש כמה ווריאנטים במיקום גנומי זה
+        # אבל אם הוזן משהו שאינו מספר אז מדובר בשם של ווריאנט וצריך לוודא שלוקחים רק את הווריאנט המבוקש
+        positive_snps = fields_reference if search_input.isdigit() else [item for item in fields_reference if search_input in item['name']]
+        # זה מטפל גם במקרים שעבור המיקום הגנומי שהוזן יש כמה ווריאנטים וזה יוצר סטרינג מתאים לפורמט של run_calculate_clade
+        last_positive_snp_string = ", ".join(f"{item['name']}+" for item in positive_snps)
+        # אחרי שהגדרנו את המשתנה הגלובלי last_positive_snp_string מריצים עליו את run_calculate_clade כדי לחשב את הענף על העץ
         run_calculate_clade()
         
         
