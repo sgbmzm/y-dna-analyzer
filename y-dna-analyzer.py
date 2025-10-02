@@ -22,7 +22,7 @@ from yclade import tree, snps, find, const
 import networkx as nx
 
 # משתנה ששומר את תאריך הגרסה של התוכנה עבור הדפסה בשורת הכותרת של התוכנה
-yda_version_date = "01 Oct 2025"
+yda_version_date = "03 Oct 2025"
 
 # משתנה מאוד חשוב שקובע האם מערכת ההפעלה הנוכחית היא ווינדוס כי אם היא לא אז אי אפשר לעשות חלק מהפעולות
 is_windows = platform.system() == "Windows"
@@ -105,7 +105,9 @@ def get_latest_yfull_tree_version() -> str:
         with urlopen(url) as resp:
             return resp.read().decode("utf-8").strip()
     except Exception as e:
-        print(f"get_latest_yfull_tree_version Eror: {e}")
+        tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
+        print(tb_str)
+        print(f"get_latest_yfull_tree_version Eror: {tb_str}")
         return None  # ערך ברירת מחדל
 
 ######################################################################################################
@@ -177,7 +179,9 @@ def update_required_files():
                 with open(save_path, "wb") as out_file:
                     out_file.write(data)
         except Exception as e:
-            failed_files.append(f"{filename} ({e})")
+            tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
+            print(tb_str)
+            failed_files.append(f"{filename} ({tb_str})")
         progress_bar['value'] = i
         root.update()
 
@@ -276,6 +280,7 @@ last_positive_snp_string = "" # שומר את רשימת הווריאנטים ה
 last_clades = [] # שומר את רשימת התוצאות שיוצאת מפונקציית run_calculate_clade לצורך שימוש עתידי
 last_yfull_link = "" # מחזיק את כתובת הקישור לעץ yfull למיקום הקלייד הסופי
 last_ftdna_link = "" # מחזיק את כתובת הקישור לעץ ftdna למיקום הקלייד הסופי
+last_ab_link = None # מחזיק לינק לקבוצת אבותינו רק אם האדם נמצא בתוך קבוצת אבותינו מוגדר בפונקציית get_ab_from_clade
 
 reference_positions_dict = {}  # מילון ששומר את נתוני הרפרנס לפי מפתח מיקום גנומי 
 reference_names_dict = {}      # מילון רפרנס לפי מפתח שמות snp מחזיר מיקום גנומי מתאים
@@ -305,6 +310,7 @@ def reset_user():
     result_var.set("")
     btn_yfull.grid_forget()
     btn_ftdna.grid_forget()
+    btn_ab.grid_forget()
     dna_loading_label.config(text="No DNA_file loaded", fg="red")
     yclade_label.config(text="Check SNP or load DNA-file", fg="red")
     user_result_var.set("")
@@ -314,6 +320,7 @@ def reset_user():
     last_dna_file_info = ""
     last_yfull_link = ""
     last_ftdna_link = ""
+    last_ab_link = None
     
 
 # פונקצייה לביטול טעינת קובץ הרפרנס    
@@ -578,9 +585,17 @@ def load_reference(ref_path):
         
         
     except Exception as e:
-        messagebox.showerror("load_reference Error", f"Failed to load reference: {e}")
+        tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
+        print(tb_str)
+        messagebox.showerror("load_reference Error", f"Failed to load reference: {tb_str}")
         #reference_loading_label.config(text="")
-        
+
+# המיקומים הללו בקובץ של מייהירטייג תמיד חיובי לכולם כולל נשים ולכן הם לא נכונים ויטופלו באופן שונה
+myheritage_incorrect_variants_positions = [
+    2679100, 3062994, 3105747, 3436239, 4179056, 4388629, 6739772, 6753387, 6892233, 7100362,
+    9986197, 10023926, 10031793, 10032021, 13312756, 13450642, 13476461, 13484571, 14001289,
+    14249991, 14491706, 14515040, 15425723, 17334694, 17361054, 17467526, 19179335, 28485084
+    ]
 
 # פונקצייה לטעינת קובץ הדנא של המשתמש מסוגים שונים ומחברות בדיקה שונות     
 def load_user_dna_file():
@@ -698,15 +713,17 @@ def load_user_dna_file():
                     
                     alleles = [int(a) for a in re.split("[/|]", gt_str) if a.isdigit()]
                     if any(a > 0 for a in alleles): # כלומר אם יש שם משהו שהוא 1 אז יש משהו חיובי וזה אומר שהוא כמו ה alt
-                        is_positive = True
+                        is_positive = "Yes"
                         alleles_str = alt
                     else:
-                        is_positive = False
+                        is_positive = "No"
                         alleles_str = ref
+                
                 else: # זה לא ויסיאף אלא קובץ שרובו אוטוזומלי מהחברות הקטנות כמו מייהירטייג אנססטרי וכו ומכיל מעט מידע על כרומזום Y
                     # השדות הראשונים תמיד הם: rsid, chrom, pos, alleles
                     rsid, chrom, pos_str, alleles_str = parts[:4]
                     ad_str = ""
+                    is_positive = "?"
                 
                 # עושה אלל אחד גדול גם היה קטן וגם אם היו שניים יחד
                 allele_str = alleles_str.upper().strip()[0] if alleles_str else ""
@@ -716,12 +733,12 @@ def load_user_dna_file():
                 if chrom not in ("Y", "24"):
                     continue
                 
-                # המיקום הזה בקובץ של מייהירטייג הוא תמיד חיובי לכולם ולכן להוסיף אחריו סימני שאלה וזה גם גורם שחישוב ענף וויפול לא יבוצע על פיו
-                if last_dna_file_info["creator"] == "myheritage" and rsid == "rs570569843":
-                    allele_str += "???" # או פשוט לדלג על השורה באמצעות: continue
+                # המיקומים הללו בקובץ של מייהירטייג תמיד חיובי לכולם כולל נשים ולכן להוסיף אחריהם סימני שאלה וזה גם גורם שחישוב ענף וויפול לא יבוצע על פיהם
+                if last_dna_file_info["creator"] == "myheritage" and int(pos_str) in myheritage_incorrect_variants_positions:
+                    allele_str += "???" # או פשוט לדלג על השורה באמצעות: continue אבל אז מאבדים מידע
                  
                 # הוספת השורה למילון המשתמש לאחר שוודאנו שמובר בשורה של Y
-                user_snps_dict[int(pos_str)] = {"chrom": chrom, "pos_str": pos_str, "ref": ref_auto_detect, "snp_name": "?", "allele": allele_str, "is_positive": "?", "ad-R/A": ad_str}
+                user_snps_dict[int(pos_str)] = {"chrom": chrom, "pos_str": pos_str, "ref_type": ref_auto_detect, "snp_name": "?", "allele": allele_str, "is_positive": is_positive, "ad-R/A": ad_str}
                 
                 # בדיקה מול הרפרנס
                 if not pos_str.isdigit():
@@ -732,21 +749,22 @@ def load_user_dna_file():
                 # אם יש רק ווריאנט אחד למיקום גנומי זה מקבלים רשימה עם איבר אחד
                 ref_infos = reference_positions_dict.get(int(pos_str))
                 
+                # אם זה מחזיר none אז אין מידע ברפרנס על המיקום הגנומי הזה ולכן פשוט מדלגים עליו כי אי אפשר לבדוק האם חיובי או שלילי ומה שם הווריאנט
                 if not ref_infos:
                     continue
-                ####@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-                # לוקחים רק את המילון הראשון ברשימת המילונים על מיקום גנומי זה אבל זה לא בסדר כי צריך לבדוק לכל מילון ומילון
-                ref_info = ref_infos[0]
-                ####@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-
-                if allele_str == ref_info["alt"]:
-                    s = f"{ref_info['name']}+"
-                    positive_snps.append(s)
-                    user_snps_dict[int(pos_str)]["is_positive"] = "Yes"   # או "כן" / "+" או כל מה שאתה רוצה
-                    user_snps_dict[int(pos_str)]["snp_name"] = ref_info['name']
-                elif allele_str == ref_info["ref"] or allele_str == ".":
-                    user_snps_dict[int(pos_str)]["is_positive"] = "No"
-                    user_snps_dict[int(pos_str)]["snp_name"] = ref_info['name']
+                
+                # עוברים על כל הווראינטים שיש ברפרנס למיקום הגנומי הנוכחי
+                # רק ווריאנטים שעוברים את הביקורת החיובית כאן יכולים להיות מחושבים לחישוב הענף בווייפול
+                # הגדרת Yes או No עבור is_positive חיונית בעיקר עבור קבצי דנ"א שאינם vcf, שאצלם בלי בדיקה זו אי אפשר לדעת האם חיוביים או שליליים
+                for ref_info in ref_infos:
+                    if allele_str == ref_info["alt"]:
+                        s = f"{ref_info['name']}+"
+                        positive_snps.append(s)
+                        user_snps_dict[int(pos_str)]["is_positive"] = "Yes"   # או "כן" / "+" או כל מה שאתה רוצה
+                        user_snps_dict[int(pos_str)]["snp_name"] = ref_info['name']
+                    elif allele_str == ref_info["ref"] or allele_str == ".":
+                        user_snps_dict[int(pos_str)]["is_positive"] = "No"
+                        user_snps_dict[int(pos_str)]["snp_name"] = ref_info['name']
 
         last_positive_snp_string = ", ".join(positive_snps)
         #print("Final positive SNPs:", last_positive_snp_string)
@@ -754,7 +772,8 @@ def load_user_dna_file():
         dna_loading_label.config(fg="blue", text=f"DNA file loaded: \nname: {os.path.basename(file_path)} \n{len(user_snps_dict)} total Y-rows  \n{len(positive_snps)} Positive Y-SNPs in DNA_file  \nref type: {ref_auto_detect}")
         user_loaded = True
         
-        if len(positive_snps) >= 100:
+        # אם יש פחות מחמישים ווריאנטים חיוביים זה אומר שיש בעיה ואין מה לחשב את ענף וייפול המתאים
+        if len(positive_snps) >= 50:
             run_calculate_clade()
         else:
             yclade_label.config(text="female / incorrect reference \n(Too little Y positive variants)", fg="red")
@@ -833,7 +852,11 @@ def get_snp_from_clade(clade: str):
                       
 # פונקצייה מאוד חשובה שמחזירה האם ענף מסויים נמצא בתוך קבוצת אבותינו או מעל אחת או יותר מקבוצות אבותינו
 def get_ab_from_clade(clade: str, from_snp = False):    # הצהרה על משתנים גלובליים
-    global last_ab_data, yfull_tree_data
+    global last_ab_data, yfull_tree_data, last_ab_link
+    
+    # איפוס המשתנש שזוכר את הלינק לקבוצת אבותינו הקודמת
+    last_ab_link = None
+    
     # אם רוצים מסניפ אז צריך קודם לדעת אל איזה ענף הסניפ הזה יושב בעץ ואז ממשיכים עם הענף המתאים
     if from_snp:
         #clade = yclade.find_clade(clade_snp)
@@ -859,9 +882,11 @@ def get_ab_from_clade(clade: str, from_snp = False):    # הצהרה על משת
         if clade in ab_clades_clean and len(ab_clades_list) < 300:
             clade_found_ab = True
             clade_found_ab_rows.append(row)
-
-        # בדיקה האם אחד ממתי הענפים של הענף הנבוקש נמצא בתוך אחת מקבוצות אבותינו
-        if any(a_clade.replace("*", "") in ab_clades_clean for a_clade in clade_sub_clades):
+            # רק אם זה בתוך ab יוצרים לינק. הבעיה היא שלפעמים זה בתוך כמה ab בגלל ענפים שמוגדרים לא נכון ואז יקבל את הלינק ל ab האחרון
+            last_ab_link = f"https://jewishdna.net/{row['AB-Group']}.html"
+        
+        # בדיקה האם אחד מתתי הענפים של הענף הנבוקש נמצא בתוך אחת מקבוצות אבותינו
+        elif any(a_clade.replace("*", "") in ab_clades_clean for a_clade in clade_sub_clades):
             sub_clades_found_ab = True
             sub_clades_found_ab_rows.append(row)
     
@@ -897,7 +922,9 @@ def run_calculate_clade(Final_clade_index = 0):
             clades = yda_find_clade(last_positive_snp_string)
                             
         except Exception as e:
-            messagebox.showerror("yda_find_clade in run_calculate_clade Error", f"find_clade failed: {e}")
+            tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
+            print(tb_str)
+            messagebox.showerror("yda_find_clade in run_calculate_clade Error", f"find_clade failed: {tb_str}")
             yclade_label.config(text="")
             return
         
@@ -912,14 +939,6 @@ def run_calculate_clade(Final_clade_index = 0):
         # האחרון הוא בעל הציון הכי גבוה ולכן בדרך כלל הכי נכון
         Final_clade = clades[Final_clade_index]
         
-        ############################################################
-        # Z2125 במיקום גנומי 19: 6892233 בקבצים הגולמיים של מייהירטייג חיובי לכולם ולכן גורם לבעיה בעיקר אצל AB-067 וצריך לדלג עליו לגמרי
-        # השורה הלא נכונה היא: rs570569843 Y 6892233 TT
-        # Known SNPs at this position: Z2125 C  to  T
-        if Final_clade.name == "R-Z2125" and user_loaded and last_dna_file_info["creator"] == "myheritage":
-            Final_clade = clades[Final_clade_index+1]    
-        ########################################################
-        
         # קבלת מידע על קבוצת אבותינו שהענף נמצא בה או שהיא נמצאת תחת הענף באמצעות פונקציה
         ab_string = get_ab_from_clade(Final_clade.name)
         
@@ -928,10 +947,13 @@ def run_calculate_clade(Final_clade_index = 0):
         age_info = getattr(Final_clade, "age_info", None)
         tmrca = getattr(age_info, "most_recent_common_ancestor", "Unknown") if age_info else "Unknown"
         formed = getattr(age_info, "formed", "Unknown") if age_info else "Unknown"
-
-        global last_yfull_link, last_ftdna_link
+        
+        # הצהרה על משתנים גלובליים עבור הלינקים
+        global last_yfull_link, last_ftdna_link, last_ab_link
+        
         last_yfull_link = f"https://www.yfull.com/tree/{name}/" if name != "Unknown" else False
         last_ftdna_link = f"https://discover.familytreedna.com/y-dna/{name}/tree/" if name != "Unknown" else False
+         
         
         more_result_warning = "\n\nwarning!: There is more result with the same 'score'\nOne of them may be wrong \nsave results and check it"
             
@@ -962,11 +984,18 @@ def run_calculate_clade(Final_clade_index = 0):
             f"{ab_string_multiline}"
         )
         
+        #######################################################################################
+        # הצבת כפתורים שרלוונטיים לתוצאות
         # לאחר שיש תוצאות הנחת כפתורי הלינקים לאילנות וייפול ופטדנא וכפתור שמירת התוצאות
         btn_yfull.grid(row=3, column=2, padx=5, pady=5)
-        btn_ftdna.grid(row=4, column=2, padx=5, pady=5)    
-        btn_save_results.grid(row=5, column=2, padx=5, pady=5)
-         
+        btn_ftdna.grid(row=4, column=2, padx=5, pady=5)
+        if last_ab_link: # זה אומר שנמצא בתוך ab ולכן יש לינק. מוגדר בפונקציית get_ab_from_clade
+            btn_ab.grid(row=5, column=2, padx=5, pady=5)
+        else:
+            btn_ab.grid_forget()
+        btn_save_results.grid(row=6, column=2, padx=5, pady=5)
+        #####################################################################################
+        
         yclade_label.config(text="Analysis finished successfully.", fg="blue")
         
         
@@ -1004,7 +1033,9 @@ def run_calculate_clade(Final_clade_index = 0):
         ''' 
         
     except Exception as e:
-        messagebox.showerror("run_calculate_clade Error", str(e))
+        tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
+        print(tb_str)
+        messagebox.showerror("run_calculate_clade Error", tb_str)
         
 # פונקצייה לשמירת התוצאות המלאות של חישוב הענפים החיוביים מ run_calculate_clade
 def save_clades_to_file():
@@ -1043,7 +1074,9 @@ def save_clades_to_file():
 
         messagebox.showinfo("Success", f"Results saved to {file_path}")
     except Exception as e:
-        messagebox.showerror("save_clades_to_file Error", f"Failed to save file: {e}")
+        tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
+        print(tb_str)
+        messagebox.showerror("save_clades_to_file Error", f"Failed to save file: {tb_str}")
 
 # ------------------------
 # פונקצייה לבדיקת שם סניפ או מיקום גנומי בנתוני המשתמש וברפרנס ומה הענף המתאים בוויפול ובאבותינו לווריאנט המבוקש     
@@ -1065,11 +1098,23 @@ def check_search_input(ref_search = True):
     if not reference_loaded:
         return
     
+    # לשכוח את הכפתורים שאולי הונחו עבור החיפוש הקודם. אבל אם כן טעון דנא של משתמש אז לא למחוק אותם כי הם עבור הדנא של המשתמש
+    if not user_loaded:
+        yclade_label.config(text="Check SNP or load DNA-file", fg="red")
+        btn_yfull.grid_forget()
+        btn_ftdna.grid_forget()
+        btn_ab.grid_forget()
+        btn_save_results.grid_forget()
+    
+    
     # לוקחים את מה שהמשתמש הקליד בתיבת החיפוש
     search_input = entry_search.get().strip().upper()[:10] # מסירים רווחים הופכים לאותיות גדולות וחותכים את כל מה שמעבר ל 10 אותיות או ספרות
     
+    if not search_input:   # אם אין כלום בשדה החיפש
+        return
+    
     # אם הקליד מספר זה מיקום גנומי ובודקים ברפרנס ובנתוני המשתמש מה כתוב בשורה המתאימה למיקום גנומי זה
-    if search_input.isdigit():
+    elif search_input.isdigit():
         pos = int(search_input)
         fields_reference = reference_positions_dict.get(pos)
         fields_user = user_snps_dict.get(pos) if user_loaded else False
@@ -1148,7 +1193,7 @@ btn_unload_dna = tk.Button(root, text="unload dna file", command=reset_user)
 
 # כפתור לבחירת קובץ הדנא של המשתמש
 btn_csv = tk.Button(root, text="Choose \nUser RAW-DNA File \nvcf/vcf.gz/txt/csv/gz/zip", command=load_user_dna_file)
-btn_csv.grid(row=1, column=4, rowspan=2)
+btn_csv.grid(row=2, column=4, rowspan=2)
 
 # תווית מידע על קובץ הרפרנס
 reference_loading_label = tk.Label(root, text="No reference-file loaded", fg="red")
@@ -1169,9 +1214,10 @@ result_var = tk.StringVar()
 result_label = tk.Label(root, textvariable=result_var, fg="green")
 result_label.grid(row=2, column=2, padx=5, pady=10)
 
-# כפתורי לינקיף לעצים של y-dna. וכפתור לשמירת תוצאות מלאות של yclade. # הגריד שלהם נמצא בפונקציית חישוב הקלייד
+# כפתורי לינקיף לעצים של y-dna. ולאתר גואיש דנא, וכפתור לשמירת תוצאות מלאות של yclade. # הגריד שלהם נמצא בפונקציית חישוב הקלייד
 btn_yfull = tk.Button(root, text="open clade in Yfull Tree", command= lambda: webbrowser.open_new(last_yfull_link))
 btn_ftdna = tk.Button(root, text="open clade in FTDNA-Discover Tree", command= lambda: webbrowser.open_new(last_ftdna_link))
+btn_ab = tk.Button(root, text="open AB in JewishDNA website", command= lambda: webbrowser.open_new(last_ab_link))
 btn_save_results = tk.Button(root, text="Save Clades to TXT", command=save_clades_to_file)
 
 ##########################################################################################################3
