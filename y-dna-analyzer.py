@@ -817,19 +817,25 @@ def load_user_dna_file():
                     header_found = True
                     continue
 
-                # מזהים את הדלימיטר בשורה הנוכחית
+                # מזהים את הדלימיטר בשורה הנוכחית אם זה טאב או פסיק ולפי זה נדע מה מפריד בין טור לטור בקובץ
                 delimiter = "\t" if "\t" in line else ","
-                parts = [p.strip().strip('"') for p in line.split(delimiter)]
-
+                
+                # מפצלים את השורה לפי הדילמיטר. ל פעם שיש דילימטר בשורה זה אומר שמתחיל חלק חדש וכך קובעים את הטורים
+                # כאן אסור לעשות סטריפים כי זה מאט מאוד ומטפל בהמון ערכים שאנחנו לא צריכים. לכן עושים את הספליט אחר כך רק על הערכים שמשתמשים בהם
+                parts = line.split(delimiter) 
+                
+                # דילוג על שורות לא תקינות אם אין בשורה לפחות 4 טורים
                 if len(parts) < 4:
-                    continue  # דילוג על שורות לא תקינות
+                    continue  
                 
                 if is_vcf_file:
                     # לקובץ ויסיאף יש סדר מסויים ומוקפד לעמודות
-                    chrom, pos_str, rsid, ref, alt = parts[:5]
-                    format_fields = parts[8].split(":")              # לדוגמה ["GT","AD","DP","GQ","PL"]
-                    #sample_index = 0 # לפעמים יש כמה נבדקים שונים וכל אחד מהם בטור אחד אחרי השני כאן מדובר באחד בלבד
-                    sample_info = parts[9 + sample_index].split(":") # זה מכיל את כל המידע על נתוני הנבדק הנוכחי וכדלהלן
+                    # הסטריפים מנקים רווחים ומרכאות
+                    chrom, pos_str, rsid, ref, alt = (p.strip().strip('"') for p in parts[:5])
+                    pos = int(pos_str) # המרת המיקום הגנומי למספר
+                    format_fields = [f.strip().strip('"') for f in parts[8].split(":")]   # לדוגמה ["GT","AD","DP","GQ","PL"]
+                    #sample_index נקבע כבר למעלה וזה אומר מה הטור שבו עמודת הדגימה של הנבדק שאותו אנו רוצים
+                    sample_info = [s.strip().strip('"') for s in parts[9 + sample_index].split(":")] # זה מכיל את כל המידע על נתוני הנבדק הנוכחי וכדלהלן
                     sample_dict = dict(zip(format_fields, sample_info)) # הופך למילון: {"GT":"0/0", "AD":"13,0", ...}
                     # עכשיו אפשר לגשת בצורה בטוחה:
                     gt_str = sample_dict.get("GT") # לוקח רק את החלק של ה־GT (למשל "0/1" או "1/1"
@@ -866,7 +872,9 @@ def load_user_dna_file():
                 
                 else: # זה לא ויסיאף אלא קובץ שרובו אוטוזומלי מהחברות הקטנות כמו מייהירטייג אנססטרי וכו ומכיל מעט מידע על כרומזום Y
                     # השדות הראשונים תמיד הם: rsid, chrom, pos, alleles
-                    rsid, chrom, pos_str, alleles_str = parts[:4]
+                    # הסטריפים מנקים רווחים ומרכאות
+                    rsid, chrom, pos_str, alleles_str = (p.strip().strip('"') for p in parts[:4])
+                    pos = int(pos_str) # המרת המיקום הגנומי למספר
                     ad_str = ""
                     is_positive = "?"
                 
@@ -883,21 +891,17 @@ def load_user_dna_file():
                 # צריך להשתמש בשורה הזו מאוד בזהירות כי זה יכול לשבש את כל החישוב.
                 # 14515040 גורם לדגימה שאמורה להיות מעל אבותינו 49 להיות במקום אחר
                 # 6892233 גורם לדגימה שאמורה להיות מעל אבותינו 67 להיות במקום אחר
-                if last_dna_file_info["creator"] == "myheritage" and int(pos_str) in [14515040, 6892233]:
+                if last_dna_file_info["creator"] == "myheritage" and pos in [14515040, 6892233]:
                     allele_str += "???" # או פשוט לדלג על השורה באמצעות: continue אבל אז מאבדים מידע
                 ###################################################################################################
                     
                 # הוספת השורה למילון המשתמש לאחר שוודאנו שמובר בשורה של Y
-                user_snps_dict[int(pos_str)] = {"chrom": chrom, "pos_str": pos_str, "ref_type": ref_auto_detect, "snp_name": "?", "allele": allele_str, "is_positive": is_positive, "ad-R/A": ad_str}
-                
-                # בדיקה מול הרפרנס
-                if not pos_str.isdigit():
-                    continue
+                user_snps_dict[pos] = {"chrom": chrom, "pos": pos, "ref_type": ref_auto_detect, "snp_name": "?", "allele": allele_str, "is_positive": is_positive, "ad-R/A": ad_str}
                 
                 # זה בודק האם יש מפתח מיקום גנומי כזה במילון הרפרנס ומחזיר רשימה של מילון אחד או יותר עבור מיקום גנומי זה
                 # לפעמים יש למיקום גנומי אחד כמה ווריאנטים ואז מקבלים רשימה עם כמה איברים
                 # אם יש רק ווריאנט אחד למיקום גנומי זה מקבלים רשימה עם איבר אחד
-                ref_infos = reference_positions_dict.get(int(pos_str))
+                ref_infos = reference_positions_dict.get(pos)
                 
                 # אם זה מחזיר none אז אין מידע ברפרנס על המיקום הגנומי הזה ולכן פשוט מדלגים עליו כי אי אפשר לבדוק האם חיובי או שלילי ומה שם הווריאנט
                 if not ref_infos:
@@ -910,11 +914,11 @@ def load_user_dna_file():
                     if allele_str == ref_info["alt"]:
                         s = f"{ref_info['name']}+"
                         positive_snps.append(s)
-                        user_snps_dict[int(pos_str)]["is_positive"] = "Yes"   # או "כן" / "+" או כל מה שאתה רוצה
-                        user_snps_dict[int(pos_str)]["snp_name"] = ref_info['name']
+                        user_snps_dict[pos]["is_positive"] = "Yes"   # או "כן" / "+" או כל מה שאתה רוצה
+                        user_snps_dict[pos]["snp_name"] = ref_info['name']
                     elif allele_str == ref_info["ref"] or allele_str == ".":
-                        user_snps_dict[int(pos_str)]["is_positive"] = "No"
-                        user_snps_dict[int(pos_str)]["snp_name"] = ref_info['name']
+                        user_snps_dict[pos]["is_positive"] = "No"
+                        user_snps_dict[pos]["snp_name"] = ref_info['name']
 
         last_positive_snp_string = ", ".join(positive_snps)
         #print("Final positive SNPs:", last_positive_snp_string)
