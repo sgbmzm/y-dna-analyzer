@@ -354,12 +354,14 @@ def yda_find_clade(snp_string):
     snp_results = snps.parse_snp_results(snp_string)
     snp_results = snps.normalize_snp_results(snp_results=snp_results, snp_aliases=yfull_tree_data.snp_aliases)
     ####################################################
+    '''
     # בודק האם ואילו ווריאנטים של הנבדק לא קיימים בעץ yfull הנוכחי
     snps_in_yfull_tree, snps_not_in_yfull_tree, all_snps = yda_yclade_warn_unknown_snps(tree=yfull_tree_data, snps=snp_results)
     if snps_not_in_yfull_tree == all_snps:
         messagebox.showerror("Error","All SNPs entered are not in the YFull tree!")
     else:
         messagebox.showerror("infooooooo",f"The SNP query contains {len(snps_not_in_yfull_tree)} SNPs not contained in the Y tree")
+    '''
     #####################################################
     clades = find.get_ordered_clade_details(tree=yfull_tree_data, snps=snp_results)
     return clades#, snps_not_in_yfull_tree
@@ -672,6 +674,33 @@ def load_reference(ref_path):
         #reference_loading_label.config(text="")
 
 
+
+def ask_user_sample(sample_names):
+    """פותח חלון עם Combobox לבחירת דגימה ומחזיר את הבחירה. מיועד ל VCF שיש בו כמה נדגמים"""
+    selected_sample = {"name": None}  # dict כדי לשתף ערך בין הפונקציה והחלון
+
+    def on_select():
+        selected_sample["name"] = combo.get()
+        top.destroy()  # סוגר את החלון
+
+    top = Toplevel(root)
+    top.title("Select Sample")
+    Label(top, text="Multiple samples detected. Please select one:").pack(padx=10, pady=10)
+
+    combo = ttk.Combobox(top, values=sample_names, state="readonly")
+    combo.pack(padx=10, pady=5)
+    combo.current(0)
+
+    btn = Button(top, text="OK", command=on_select)
+    btn.pack(pady=10)
+
+    top.grab_set()          # מונע אינטראקציה עם החלון הראשי
+    top.wait_window()       # מחכה לסגירת החלון
+
+    return selected_sample["name"]
+
+
+
 # פונקצייה לטעינת קובץ הדנא של המשתמש מסוגים שונים ומחברות בדיקה שונות     
 def load_user_dna_file():
     
@@ -737,6 +766,39 @@ def load_user_dna_file():
     ##########################################################################################################
     
     try:
+        
+        ###############################################################################
+        # בדיקה האם זה vcf הכולל דגימות של נדגמים רבים.
+        # אם כן נותנים למשתמש לבחור נדגם אחד מהם שעליו להמשיך להריץ את התוכנה
+        if is_vcf_file:
+            
+            # פותח את הקובץ ובודק האם יש בו כמה דגימות ובכל מקרה אוסף את כל שמות הדגימות שיש בקובץ
+            with universal_opener(file_path, only_dna_if_zip=True) as f:
+                headers = []
+                sample_names = []
+
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("##"):
+                        continue
+            
+                    if line.startswith("#CHROM"):
+                        headers = line.split("\t")
+                        sample_names = headers[9:]
+                        break
+
+            # אם יש כמה דגימות – פותח חלון לבחירת דגימה
+            if len(sample_names) >1:
+                sample_name = ask_user_sample(sample_names)
+                # קובע את הטור של הנדגם בתוך ה vcf ואם לא אז 0 זה הטור הראשון כלומר הנדגם הראשון
+                sample_index = headers.index(sample_name) - 9 if sample_name else 0
+            else:
+                sample_index = 0
+                sample_name = sample_names[0]
+                
+        ###############################################################################
+        
+    # פתיחת הקובץ וקריאת כל השורות לקבוע איזה ווריאנטים יש בכרומוזום Y
         with universal_opener(file_path, only_dna_if_zip=True) as f:
             header_found = False
             for line in f:
@@ -766,7 +828,7 @@ def load_user_dna_file():
                     # לקובץ ויסיאף יש סדר מסויים ומוקפד לעמודות
                     chrom, pos_str, rsid, ref, alt = parts[:5]
                     format_fields = parts[8].split(":")              # לדוגמה ["GT","AD","DP","GQ","PL"]
-                    sample_index = 0 # לפעמים יש כמה נבדקים שונים וכל אחד מהם בטור אחד אחרי השני כאן מדובר באחד בלבד
+                    #sample_index = 0 # לפעמים יש כמה נבדקים שונים וכל אחד מהם בטור אחד אחרי השני כאן מדובר באחד בלבד
                     sample_info = parts[9 + sample_index].split(":") # זה מכיל את כל המידע על נתוני הנבדק הנוכחי וכדלהלן
                     sample_dict = dict(zip(format_fields, sample_info)) # הופך למילון: {"GT":"0/0", "AD":"13,0", ...}
                     # עכשיו אפשר לגשת בצורה בטוחה:
@@ -811,7 +873,7 @@ def load_user_dna_file():
                 # עושה אלל אחד גדול גם היה קטן וגם אם היו שניים יחד
                 allele_str = alleles_str.upper().strip()[0] if alleles_str else ""
             
-                # נרמול שם הכרומוזום ל־Y
+                # נרמול שם הכרומוזום כדי שיהיה אפשר לבדוק באופן אחיד שמדובר בשורה של כרומוזום Y
                 chrom = chrom.replace("chr", "").upper()
                 if chrom not in ("Y", "24"):
                     continue
@@ -857,7 +919,7 @@ def load_user_dna_file():
         last_positive_snp_string = ", ".join(positive_snps)
         #print("Final positive SNPs:", last_positive_snp_string)
 
-        dna_loading_label.config(fg="blue", text=f"DNA file loaded: \nname: {os.path.basename(file_path)} \n{len(user_snps_dict)} total Y-rows  \n{len(positive_snps)} Positive Y-SNPs in DNA_file  \nref type: {ref_auto_detect}")
+        dna_loading_label.config(fg="blue", text=f"DNA file loaded: \nname: {os.path.basename(file_path)} {f'\nvcf sample name: {sample_name}' if is_vcf_file else ""} \n{len(user_snps_dict)} total Y-rows  \n{len(positive_snps)} Positive Y-SNPs in DNA_file  \nref type: {ref_auto_detect}")
         user_loaded = True
         
         # אם יש פחות ממאה ווריאנטים חיוביים זה אומר שיש בעיה ואין מה לחשב את ענף וייפול המתאים
@@ -875,397 +937,6 @@ def load_user_dna_file():
         messagebox.showerror("load_user_dna_file Error", f"Failed reading file: {tb_str}")
         dna_loading_label.config(text="")
         yclade_label.config(text="Check SNP or load DNA-file", fg="red")
-        
-        
-        
-        
-        
-        
-        
-        
-'''        
-def load_user_dna_file():
-    # איפוס המשתמש
-    reset_user()
-
-    # בחירת קובץ DNA
-    file_path = filedialog.askopenfilename(
-        title="Select DNA file",
-        filetypes=[("DNA files", "*.txt *.csv *.gz *.zip *.vcf"), ("All files", "*.*")]
-    )
-    if not file_path:
-        return
-
-    # בדיקה ראשונית על הקובץ
-    global last_dna_file_info
-    last_dna_file_info = detect_headlines(file_path)
-    ref_auto_detect = last_dna_file_info.get("ref")
-
-    ref_path = Msnps_hg19_path if ref_auto_detect == "hg19" else snps_hg38_path if ref_auto_detect == "hg38" else None
-    if not ref_auto_detect:
-        choice = messagebox.askyesnocancel(
-            "Reference not Autodetected",
-            "Autodetected Reference failed.\nChoose hg19, hg38, or None.\nYes = hg38, No = hg19, Cancel = None"
-        )
-        ref_path = snps_hg38_path if choice else Msnps_hg19_path if (choice is False) else None
-
-    global last_reference_file, reference_loaded
-    if last_reference_file != ref_path:
-        reference_loaded = False
-
-    if not reference_loaded:
-        dna_loading_label.config(text="Waiting for Loading reference for this file ...", fg="green")
-        yclade_label.config(text="Waiting for Loading reference & DNA-file ...", fg="green")
-        load_reference(ref_path)
-
-    global last_clades, last_positive_snp_string, last_dna_file, user_snps_dict, user_loaded
-    if not reference_loaded:
-        reset_user()
-        return
-
-    last_clades = []
-    last_positive_snp_string = ""
-    last_dna_file = file_path
-
-    dna_loading_label.config(text=f"Loading {os.path.basename(file_path)} ...")
-    root.update()
-
-    positive_snps = []
-    user_snps_dict = {}
-
-    is_ftdna_big_y_vcf = file_path.endswith(".zip") and get_first_file_name_in_zip(file_path) and get_first_file_name_in_zip(file_path).endswith(".vcf")
-    is_vcf_file = file_path.endswith(".vcf") or file_path.endswith(".vcf.gz") or is_ftdna_big_y_vcf
-
-    try:
-        with universal_opener(file_path, only_dna_if_zip=True) as f:
-            header_found = False
-            headers = []
-            sample_names = []
-
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("##"):
-                    continue
-
-                # טיפול ב-VCF מרובה דגימות
-                if line.startswith("#CHROM") and is_vcf_file:
-                    headers = line.split("\t")
-                    sample_names = headers[9:]
-                    header_found = True
-                    break
-
-            if is_vcf_file and sample_names:
-                # יצירת dropdown לבחירת דגימה
-                sample_dropdown['values'] = sample_names
-                sample_dropdown.current(0)
-                messagebox.showinfo("VCF Samples", "Select a sample from the dropdown and reload to process.")
-                return
-
-        # לאחר שהמשתמש בחר דגימה (או במקרה של קובץ יחיד)
-        sample_name = sample_dropdown.get() if sample_names else None
-        sample_index = headers.index(sample_name) - 9 if sample_name else 0
-
-        # קריאה ועיבוד שורות הקובץ
-        with universal_opener(file_path, only_dna_if_zip=True) as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("##") or line.startswith("#"):
-                    continue
-
-                delimiter = "\t" if "\t" in line else ","
-                parts = [p.strip().strip('"') for p in line.split(delimiter)]
-                if len(parts) < 4:
-                    continue
-
-                if is_vcf_file:
-                    chrom, pos_str, rsid, ref, alt = parts[:5]
-                    format_fields = parts[8].split(":")
-                    sample_info = parts[9 + sample_index].split(":")
-                    sample_dict = dict(zip(format_fields, sample_info))
-                    gt_str = sample_dict.get("GT")
-                    ad_str = sample_dict.get("AD")
-                    alleles = [int(a) for a in re.split("[/|]", gt_str) if a.isdigit()]
-                    is_positive = "Yes" if any(a > 0 for a in alleles) else "No"
-                    alleles_str = alt if is_positive == "Yes" else ref
-                else:
-                    rsid, chrom, pos_str, alleles_str = parts[:4]
-                    ad_str = ""
-                    is_positive = "?"
-
-                allele_str = alleles_str.upper().strip()[0] if alleles_str else ""
-                chrom = chrom.replace("chr", "").upper()
-                if chrom not in ("Y", "24"):
-                    continue
-
-                ###################################################################################################
-                # המיקומים הללו בקובץ של מייהירטייג תמיד חיובי לכולם כולל נשים ולכן להוסיף אחריהם סימני שאלה וזה גם גורם שחישוב ענף וויפול לא יבוצע על פיהם
-                # צריך להשתמש בשורה הזו מאוד בזהירות כי זה יכול לשבש את כל החישוב.
-                # 14515040 גורם לדגימה שאמורה להיות מעל אבותינו 49 להיות במקום אחר
-                # 6892233 גורם לדגימה שאמורה להיות מעל אבותינו 67 להיות במקום אחר
-                if last_dna_file_info["creator"] == "myheritage" and int(pos_str) in [14515040, 6892233]:
-                    allele_str += "???" # או פשוט לדלג על השורה באמצעות: continue אבל אז מאבדים מידע
-                ###################################################################################################
-                
-                user_snps_dict[int(pos_str)] = {
-                    "chrom": chrom,
-                    "pos_str": pos_str,
-                    "ref_type": ref_auto_detect,
-                    "snp_name": "?",
-                    "allele": allele_str,
-                    "is_positive": is_positive,
-                    "ad-R/A": ad_str
-                }
-
-                if not pos_str.isdigit():
-                    continue
-                ref_infos = reference_positions_dict.get(int(pos_str))
-                if not ref_infos:
-                    continue
-                for ref_info in ref_infos:
-                    if allele_str == ref_info["alt"]:
-                        positive_snps.append(f"{ref_info['name']}+")
-                        user_snps_dict[int(pos_str)]["is_positive"] = "Yes"
-                        user_snps_dict[int(pos_str)]["snp_name"] = ref_info['name']
-                    elif allele_str == ref_info["ref"] or allele_str == ".":
-                        user_snps_dict[int(pos_str)]["is_positive"] = "No"
-                        user_snps_dict[int(pos_str)]["snp_name"] = ref_info['name']
-
-        last_positive_snp_string = ", ".join(positive_snps)
-        dna_loading_label.config(
-            fg="blue",
-            text=f"DNA file loaded: \nname: {os.path.basename(file_path)} \n"
-                 f"{len(user_snps_dict)} total Y-rows  \n"
-                 f"{len(positive_snps)} Positive Y-SNPs in DNA_file  \nref type: {ref_auto_detect}"
-        )
-        user_loaded = True
-
-        if len(positive_snps) >= 100:
-            run_calculate_clade()
-        else:
-            yclade_label.config(text="female / incorrect reference \n(Too little Y positive variants)", fg="red")
-
-        btn_unload_dna.grid(row=1, column=4, padx=5, pady=5)
-
-    except Exception as e:
-        tb_str = traceback.format_exc()
-        print(tb_str)
-        messagebox.showerror("load_user_dna_file Error", f"Failed reading file: {tb_str}")
-        dna_loading_label.config(text="")
-        yclade_label.config(text="Check SNP or load DNA-file", fg="red")
-        
-'''
-
-
-def ask_user_sample(sample_names):
-    """פותח חלון עם Combobox לבחירת דגימה ומחזיר את הבחירה"""
-    selected_sample = {"name": None}  # dict כדי לשתף ערך בין הפונקציה והחלון
-
-    def on_select():
-        selected_sample["name"] = combo.get()
-        top.destroy()  # סוגר את החלון
-
-    top = Toplevel(root)
-    top.title("Select Sample")
-    Label(top, text="Multiple samples detected. Please select one:").pack(padx=10, pady=10)
-
-    combo = ttk.Combobox(top, values=sample_names, state="readonly")
-    combo.pack(padx=10, pady=5)
-    combo.current(0)
-
-    btn = Button(top, text="OK", command=on_select)
-    btn.pack(pady=10)
-
-    top.grab_set()          # מונע אינטראקציה עם החלון הראשי
-    top.wait_window()       # מחכה לסגירת החלון
-
-    return selected_sample["name"]
-
-
-def load_user_dna_file():
-    # איפוס המשתמש
-    reset_user()
-
-    # בחירת קובץ DNA
-    file_path = filedialog.askopenfilename(
-        title="Select DNA file",
-        filetypes=[("DNA files", "*.txt *.csv *.gz *.zip *.vcf"), ("All files", "*.*")]
-    )
-    if not file_path:
-        return
-
-    # בדיקה ראשונית על הקובץ
-    global last_dna_file_info
-    last_dna_file_info = detect_headlines(file_path)
-    ref_auto_detect = last_dna_file_info.get("ref")
-
-    ref_path = Msnps_hg19_path if ref_auto_detect == "hg19" else snps_hg38_path if ref_auto_detect == "hg38" else None
-    if not ref_auto_detect:
-        choice = messagebox.askyesnocancel(
-            "Reference not Autodetected",
-            "Autodetected Reference failed.\nChoose hg19, hg38, or None.\nYes = hg38, No = hg19, Cancel = None"
-        )
-        ref_path = snps_hg38_path if choice else Msnps_hg19_path if (choice is False) else None
-
-    global last_reference_file, reference_loaded
-    if last_reference_file != ref_path:
-        reference_loaded = False
-
-    if not reference_loaded:
-        dna_loading_label.config(text="Waiting for Loading reference for this file ...", fg="green")
-        yclade_label.config(text="Waiting for Loading reference & DNA-file ...", fg="green")
-        load_reference(ref_path)
-
-    global last_clades, last_positive_snp_string, last_dna_file, user_snps_dict, user_loaded
-    if not reference_loaded:
-        reset_user()
-        return
-
-    last_clades = []
-    last_positive_snp_string = ""
-    last_dna_file = file_path
-
-    dna_loading_label.config(text=f"Loading {os.path.basename(file_path)} ...")
-    root.update()
-
-    positive_snps = []
-    user_snps_dict = {}
-
-    is_ftdna_big_y_vcf = file_path.endswith(".zip") and get_first_file_name_in_zip(file_path) and get_first_file_name_in_zip(file_path).endswith(".vcf")
-    is_vcf_file = file_path.endswith(".vcf") or file_path.endswith(".vcf.gz") or is_ftdna_big_y_vcf
-
-    try:
-        with universal_opener(file_path, only_dna_if_zip=True) as f:
-            headers = []
-            sample_names = []
-
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("##"):
-                    continue
-
-                # טיפול ב-VCF מרובה דגימות
-                if line.startswith("#CHROM") and is_vcf_file:
-                    headers = line.split("\t")
-                    sample_names = headers[9:]
-                    break
-
-        # אם יש כמה דגימות – פותח חלון לבחירת דגימה
-        sample_name = None
-        if is_vcf_file and len(sample_names) >1:
-            sample_name = ask_user_sample(sample_names)
-        sample_index = headers.index(sample_name) - 9 if sample_name else 0
-
-        # קריאה ועיבוד שורות הקובץ
-        with universal_opener(file_path, only_dna_if_zip=True) as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("##") or line.startswith("#"):
-                    continue
-
-                delimiter = "\t" if "\t" in line else ","
-                parts = [p.strip().strip('"') for p in line.split(delimiter)]
-                if len(parts) < 4:
-                    continue
-
-                if is_vcf_file:
-                    chrom, pos_str, rsid, ref, alt = parts[:5]
-                    format_fields = parts[8].split(":")
-                    sample_info = parts[9 + sample_index].split(":")
-                    sample_dict = dict(zip(format_fields, sample_info))
-                    gt_str = sample_dict.get("GT")
-                    ad_str = sample_dict.get("AD")
-                    alleles = [int(a) for a in re.split("[/|]", gt_str) if a.isdigit()]
-                    is_positive = "Yes" if any(a > 0 for a in alleles) else "No"
-                    alleles_str = alt if is_positive == "Yes" else ref
-                else:
-                    rsid, chrom, pos_str, alleles_str = parts[:4]
-                    ad_str = ""
-                    is_positive = "?"
-
-                allele_str = alleles_str.upper().strip()[0] if alleles_str else ""
-                chrom = chrom.replace("chr", "").upper()
-                if chrom not in ("Y", "24"):
-                    continue
-
-                ###################################################################################################
-                # המיקומים הללו בקובץ של מייהירטייג תמיד חיובי לכולם כולל נשים ולכן להוסיף אחריהם סימני שאלה וזה גם גורם שחישוב ענף וויפול לא יבוצע על פיהם
-                # צריך להשתמש בשורה הזו מאוד בזהירות כי זה יכול לשבש את כל החישוב.
-                # 14515040 גורם לדגימה שאמורה להיות מעל אבותינו 49 להיות במקום אחר
-                # 6892233 גורם לדגימה שאמורה להיות מעל אבותינו 67 להיות במקום אחר
-                if last_dna_file_info["creator"] == "myheritage" and int(pos_str) in [14515040, 6892233]:
-                    allele_str += "???" # או פשוט לדלג על השורה באמצעות: continue אבל אז מאבדים מידע
-                ###################################################################################################
-                
-
-                user_snps_dict[int(pos_str)] = {
-                    "chrom": chrom,
-                    "pos_str": pos_str,
-                    "ref_type": ref_auto_detect,
-                    "snp_name": "?",
-                    "allele": allele_str,
-                    "is_positive": is_positive,
-                    "ad-R/A": ad_str
-                }
-
-                if not pos_str.isdigit():
-                    continue
-                ref_infos = reference_positions_dict.get(int(pos_str))
-                if not ref_infos:
-                    continue
-                for ref_info in ref_infos:
-                    if allele_str == ref_info["alt"]:
-                        positive_snps.append(f"{ref_info['name']}+")
-                        user_snps_dict[int(pos_str)]["is_positive"] = "Yes"
-                        user_snps_dict[int(pos_str)]["snp_name"] = ref_info['name']
-                    elif allele_str == ref_info["ref"] or allele_str == ".":
-                        user_snps_dict[int(pos_str)]["is_positive"] = "No"
-                        user_snps_dict[int(pos_str)]["snp_name"] = ref_info['name']
-
-        last_positive_snp_string = ", ".join(positive_snps)
-        dna_loading_label.config(
-            fg="blue",
-            text=f"DNA file loaded: \nname: {os.path.basename(file_path)} \n"
-                 f"{len(user_snps_dict)} total Y-rows  \n"
-                 f"{len(positive_snps)} Positive Y-SNPs in DNA_file  \nref type: {ref_auto_detect}"
-        )
-        user_loaded = True
-
-        if len(positive_snps) >= 100:
-            run_calculate_clade()
-        else:
-            yclade_label.config(text="female / incorrect reference \n(Too little Y positive variants)", fg="red")
-
-        btn_unload_dna.grid(row=1, column=4, padx=5, pady=5)
-
-    except Exception as e:
-        tb_str = traceback.format_exc()
-        print(tb_str)
-        messagebox.showerror("load_user_dna_file Error", f"Failed reading file: {tb_str}")
-        dna_loading_label.config(text="")
-        yclade_label.config(text="Check SNP or load DNA-file", fg="red")
-
-        
-        
-        
-        
-        
-        
-        
-        
-    
-
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         
         
 
@@ -1404,7 +1075,7 @@ def run_calculate_clade(Final_clade_index = 0):
                             
         except Exception as e:
             tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
-            print(tb_str)
+            print(tb_str) 
             messagebox.showerror("yda_find_clade in run_calculate_clade Error", f"find_clade failed: {tb_str}")
             yclade_label.config(text="")
             return
@@ -1413,8 +1084,8 @@ def run_calculate_clade(Final_clade_index = 0):
         last_clades = clades
 
         if not clades:
-            result_var.set("No clades returned by yclade.")
             yclade_label.config(text="Analysis finished - no clades returned.")
+            result_var.set("All variants entered are not currently on the Yfull tree.\nTherefore, it is not possible to determine a location on the tree.")
             return
         
         # האחרון הוא בעל הציון הכי גבוה ולכן בדרך כלל הכי נכון
@@ -1582,6 +1253,7 @@ def check_search_input(ref_search = True):
     # לשכוח את הכפתורים שאולי הונחו עבור החיפוש הקודם. אבל אם כן טעון דנא של משתמש אז לא למחוק אותם כי הם עבור הדנא של המשתמש
     if not user_loaded:
         yclade_label.config(text="Check SNP or load DNA-file", fg="red")
+        result_var.set("")
         btn_yfull.grid_forget()
         btn_ftdna.grid_forget()
         btn_ab.grid_forget()
