@@ -3,7 +3,7 @@ import tkinter as tk
 from tkinter import *
 from tkinter import filedialog, messagebox, ttk
 from platformdirs import user_data_dir
-import traceback # ללכוד את כל השגיאות באופן מפורט 
+#import traceback # ללכוד את כל השגיאות באופן מפורט 
 import csv
 import os
 import re
@@ -105,9 +105,9 @@ def get_latest_yfull_tree_version() -> str:
         with urlopen(url) as resp:
             return resp.read().decode("utf-8").strip()
     except Exception as e:
-        tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
-        print(tb_str)
-        print(f"get_latest_yfull_tree_version Eror: {tb_str}")
+        #tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
+        #print(tb_str)
+        print(f"get_latest_yfull_tree_version Eror: {e}")
         return None  # ערך ברירת מחדל
 
 ######################################################################################################
@@ -179,9 +179,9 @@ def update_required_files():
                 with open(save_path, "wb") as out_file:
                     out_file.write(data)
         except Exception as e:
-            tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
-            print(tb_str)
-            failed_files.append(f"{filename} ({tb_str})")
+            #tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
+            #print(tb_str)
+            failed_files.append(f"{filename} ({str(e)})")
         progress_bar['value'] = i
         root.update()
 
@@ -424,8 +424,8 @@ def searc_lca():
     
     # שגיאה יכולה להיות או בגלל שאין בעץ ווריאנט כמו שהוזן או בגלל שהוזנו ערכים לא תקינים כגון מספרים ומילים שונות
     except Exception as e:
-        tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
-        print(tb_str)
+        #tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
+        #print(tb_str)
         messagebox.showerror("searc_lca Error", f"{e}\nThe search box should contain at least two variant names, separated by a comma.\nFor example: L243, ZS222")
   
         
@@ -668,9 +668,9 @@ def load_reference(ref_path):
         
         
     except Exception as e:
-        tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
-        print(tb_str)
-        messagebox.showerror("load_reference Error", f"Failed to load reference: {tb_str}")
+        #tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
+        #print(tb_str)
+        messagebox.showerror("load_reference Error", f"Failed to load reference: {e}")
         #reference_loading_label.config(text="")
 
 
@@ -936,9 +936,9 @@ def load_user_dna_file():
         btn_unload_dna.grid(row=1, column=4, padx=5, pady=5)
 
     except Exception as e:
-        tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
-        print(tb_str)
-        messagebox.showerror("load_user_dna_file Error", f"Failed reading file: {tb_str}")
+        #tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
+        #print(tb_str)
+        messagebox.showerror("load_user_dna_file Error", f"Failed reading file: {e}")
         dna_loading_label.config(text="")
         yclade_label.config(text="Check SNP or load DNA-file", fg="red")
         
@@ -1078,9 +1078,9 @@ def run_calculate_clade(Final_clade_index = 0):
             clades = yda_find_clade(last_positive_snp_string)
                             
         except Exception as e:
-            tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
-            print(tb_str) 
-            messagebox.showerror("yda_find_clade in run_calculate_clade Error", f"find_clade failed: {tb_str}")
+            #tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
+            #print(tb_str) 
+            messagebox.showerror("yda_find_clade in run_calculate_clade Error", f"find_clade failed: {e}")
             yclade_label.config(text="")
             return
         
@@ -1189,9 +1189,9 @@ def run_calculate_clade(Final_clade_index = 0):
         ''' 
         
     except Exception as e:
-        tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
-        print(tb_str)
-        messagebox.showerror("run_calculate_clade Error", tb_str)
+        #tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
+        #print(tb_str)
+        messagebox.showerror("run_calculate_clade Error", e)
         
 # פונקצייה לשמירת התוצאות המלאות של חישוב הענפים החיוביים מ run_calculate_clade
 def save_clades_to_file():
@@ -1230,9 +1230,9 @@ def save_clades_to_file():
 
         messagebox.showinfo("Success", f"Results saved to {file_path}")
     except Exception as e:
-        tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
-        print(tb_str)
-        messagebox.showerror("save_clades_to_file Error", f"Failed to save file: {tb_str}")
+        #tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
+        #print(tb_str)
+        messagebox.showerror("save_clades_to_file Error", f"Failed to save file: {e}")
 
 # ------------------------
 # פונקצייה לבדיקת שם סניפ או מיקום גנומי בנתוני המשתמש וברפרנס ומה הענף המתאים בוויפול ובאבותינו לווריאנט המבוקש     
@@ -1494,6 +1494,7 @@ root.mainloop()
 # כרומוזום Y נקרא בקובץ:   Y
 
 # מייהירטייג: כתוב שם החברה, כתוב רפרנס 
+
 
 
 
