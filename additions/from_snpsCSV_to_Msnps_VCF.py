@@ -56,12 +56,12 @@ def snps_to_Msnps(csv_path):
     columns = ["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"]
 
     # === כתיבת קובץ VCF.GZ ===
-    with gzip.open(vcf_path, 'wt') as vcf_out:
+    with gzip.open(vcf_path, 'wt',  encoding='utf-8') as vcf_out:
         for line in vcf_header:
             vcf_out.write(line + "\n")
         vcf_out.write("\t".join(columns) + "\n")
 
-        with open(csv_path, newline='') as csvfile:
+        with open(csv_path, newline='',  encoding='utf-8') as csvfile:
             reader = csv.reader(csvfile)
             next(reader, None)  # דילוג על שורת כותרת
             for row in reader:
@@ -91,6 +91,7 @@ snps19_file = "snps_hg19.csv"
 # קריאה לפונקצייה
 snps_to_Msnps(snps38_file)
 #snps_to_Msnps(snps19_file)
+
 
 
 
