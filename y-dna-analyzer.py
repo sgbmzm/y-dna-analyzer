@@ -22,7 +22,7 @@ from yclade import tree, snps, find, const
 import networkx as nx
 
 # משתנה ששומר את תאריך הגרסה של התוכנה עבור הדפסה בשורת הכותרת של התוכנה
-yda_version_date = "05 Oct 2025"
+yda_version_date = "07 Nov 2025"
 
 # משתנה מאוד חשוב שקובע האם מערכת ההפעלה הנוכחית היא ווינדוס כי אם היא לא אז אי אפשר לעשות חלק מהפעולות
 is_windows = platform.system() == "Windows"
@@ -149,7 +149,8 @@ def update_required_files():
         ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/required_files/yda_yfull_tree_version.txt", "yda_yfull_tree_version.txt"),
         ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/required_files/yda_yfull_tree.json", "yda_yfull_tree.json"),
         ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/required_files/Msnps_hg19.vcf.gz", "Msnps_hg19.vcf.gz"),
-        ("https://ybrowse.org/gbrowse2/gff/snps_hg38.vcf.gz", "snps_hg38.vcf.gz"),
+        ("https://github.com/sgbmzm/y-dna-analyzer/releases/download/y-dna-analyzer/Msnps_hg38.vcf.gz", "Msnps_hg38.vcf.gz"),
+        #("https://ybrowse.org/gbrowse2/gff/snps_hg38.vcf.gz", "snps_hg38.vcf.gz"),
     ]
     '''
     # גרסת עץ YFull הכי עדכנית והוספתה לרשימת ההורדות
@@ -204,7 +205,7 @@ def get_required_files():
         
     # הגדרת הנתיבים לקבצים הדרושים לתוכנה בתיקייה הייעודית לקבצי התוכנה
     ab_groups_snp_path = os.path.join(yda_dir_path, "ab_groups_snp.csv")
-    snps_hg38_path = os.path.join(yda_dir_path, "snps_hg38.vcf.gz")
+    snps_hg38_path = os.path.join(yda_dir_path, "Msnps_hg38.vcf.gz")
     Msnps_hg19_path = os.path.join(yda_dir_path, "Msnps_hg19.vcf.gz")
     yda_tree_path = os.path.join(yda_dir_path, f"yda_yfull_tree.json")
     yda_tree_version = os.path.join(yda_dir_path, f"yda_yfull_tree_version.txt")
@@ -218,7 +219,7 @@ def get_required_files():
     # אם אפילו אחד מהם לא קיים מנסים במיקום השני שהוא בתיקייה שממנה רצה התוכנה
     else:
         ab_groups_snp_path = resource_path("ab_groups_snp.csv")  # כאן את שם הקובץ שלך
-        snps_hg38_path = resource_path("snps_hg38.vcf.gz")
+        snps_hg38_path = resource_path("Msnps_hg38.vcf.gz")
         Msnps_hg19_path = resource_path("Msnps_hg19.vcf.gz")
         yda_tree_path = resource_path("yda_yfull_tree.json")
         yda_tree_version = resource_path("yda_yfull_tree_version.txt")
@@ -235,7 +236,7 @@ def get_required_files():
             # שואלים ואז קוראים לפונקציית הורדת הקבצים ואם היא מצליחה היא מחזירה טרו ואז הקבצים בתיקייה הייעודית להם
             if messagebox.askyesno("required files question", "The software is missing the required files. \nWould you like to download them now?") and update_required_files():
                 ab_groups_snp_path = os.path.join(yda_dir_path, "ab_groups_snp.csv")
-                snps_hg38_path = os.path.join(yda_dir_path, "snps_hg38.vcf.gz")
+                snps_hg38_path = os.path.join(yda_dir_path, "Msnps_hg38.vcf.gz")
                 Msnps_hg19_path = os.path.join(yda_dir_path, "Msnps_hg19.vcf.gz")
                 yda_tree_path = os.path.join(yda_dir_path, f"yda_yfull_tree.json")
                 yda_tree_version = os.path.join(yda_dir_path, f"yda_yfull_tree_version.txt")
@@ -556,20 +557,20 @@ def detect_headlines(file_path):
     creation_date = "unknown"
        
     #######################################################################
-    if "haplocaller" in file_path:
+    
+    if is_gz_only(file_path): # אם זה קובץ שמסתיים רק ב gz ולא vcf.gz וכדומה
+        '''
+        # זה בוטל כי ftdna הפסיקו לתת שם haplocaller. 
+        #internal_name = get_gz_internal_filename(file_path) # מנסה למצוא האם יש שם לקובץ הפנימי שבתוך הדחיסה
+        # אם יש שם ובתוך השם יש את המילה haplocaller סימן שזה קובץ y של ftdna ואני יודע שהוא hg38
+        #if internal_name and "haplocaller" in internal_name:
+        '''
+        # כרגע אין ברירה, וכל קובץ gz לבד אנו מניחים שהוא של ftdna וכלל מידע על Y
         ref = "hg38"
         creator = "ftdna"
         creation_date = "unknown"
-    
-    elif is_gz_only(file_path): # אם זה קובץ שמסתיים רק ב gz ולא vcf.gz וכדומה
-        internal_name = get_gz_internal_filename(file_path) # מנסה למצוא האם יש שם לקובץ הפנימי שבתוך הדחיסה
-        # אם יש שם ובתוך השם יש את המילה haplocaller סימן שזה קובץ y של ftdna ואני יודע שהוא hg38
-        if internal_name and "haplocaller" in internal_name:
-            ref = "hg38"
-            creator = "ftdna"
-            creation_date = "unknown"
-            #return {"ref": ref, "creator": creator, "creation_date": creation_date}
-    
+        #return {"ref": ref, "creator": creator, "creation_date": creation_date}
+
    ############################################################################
     
     ref_map = {
@@ -617,26 +618,37 @@ def load_reference(ref_path):
     # בדיקת או בחירת הרפרנס המתאים לקובץ הדנא של המשתמש
     ref_type = ref_file_info["ref"]
     
+    # משתנה שבודק האם שם הקובץ מסתיים ב CSV זה אומר שצריך לטפל בזה כקובץ CSV
+    is_csv_ref = ref_path.endswith(".csv") or ref_path.endswith(".csv.gz")
+    
     opener = gzip.open if ref_path.endswith(".gz") else open
+    
     try:
         with opener(ref_path, "rt", encoding="utf-8", errors="replace") as f:
+            
             for line in f:
-                if line.startswith("#"):
-                    continue
-                fields = line.rstrip("\n").split("\t")
-                try:
-                    chrom = fields[0]
-                    pos = int(fields[1])
-                    snp_names = fields[2] # שים לב - יכול להכיל כמה שמות מופרדים בפסיק
-                    ref = fields[3].upper()
-                    alt = fields[4].upper()
-                except Exception:
-                    continue
+                
+                ###################print(line)
                 
                 # מדלג על כל השורות שלא שייכות לכרומוזום Y
-                chrom_norm = chrom.lower().replace("chr", "")
-                if chrom_norm != "y":
+                # בכל קבצי הרפרנס השורות מתחילות השורות הרלוונטיות מתחילות ב "chrY"
+                if not line.startswith("chrY"):
                     continue
+                
+                # כאן אסור לעשות סטריפ כי זה מאט מאוד את הטעינה. נעשה אחר כך סטריפ רק על המידע שצריך.
+                fields = line.split("\t") # כי העמודות מופרדות בטאבים בקובץ VCF
+                
+                try:
+                    chrom = fields[0].strip().strip('"') 
+                    pos = int(fields[1].strip().strip('"')) 
+                    snp_names = fields[2].strip().strip('"') # בקובץ ויסיאף יכול להכיל כמה שמות
+                    ref = fields[3].strip().strip('"').upper()
+                    alt = fields[4].strip().strip('"').upper()
+                except Exception as e:
+                    print(e)
+                    #print(f"Skipping line due to error: {line.strip()}")
+                    continue
+                
                 
                 # אם המיקום עדיין לא קיים במילון – צור רשימה חדשה שתכיל את כל הווריאנטים הקיימים עבור המיקום הגנומי הזה
                 # צריך רשימה כי יש לפעמים שבמיקום גנומי אחד יש כמה ווריאנטים
@@ -1493,6 +1505,7 @@ root.mainloop()
 # כרומוזום Y נקרא בקובץ:   Y
 
 # מייהירטייג: כתוב שם החברה, כתוב רפרנס 
+
 
 
 
