@@ -76,8 +76,11 @@ def snps_to_Msnps(csv_path):
 # === דוגמה לשימוש ===
 
 # אם הקובץ שמור באותה תיקייה שבה שמור הסקריפט הזה
-snps_file = "snps_hg38.csv"
+snps38_file = "snps_hg38.csv"
+snps19_file = "snps_hg19.csv"
 
 # קריאה לפונקצייה
-snps_to_Msnps(snps_file)
+snps_to_Msnps(snps38_file)
+#snps_to_Msnps(snps19_file)
+
 
