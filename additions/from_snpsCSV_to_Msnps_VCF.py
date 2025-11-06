@@ -1,3 +1,12 @@
+# באמצעות הקוד הזה ממירים קובץ רפרנס מ CSV ל VCF.GZ
+# https://ybrowse.org/gbrowse2/gff/snps_hg38.csv
+#https://ybrowse.org/gbrowse2/gff/snps_hg19.csv
+
+# הקוד הזה צריך להיות שמור באותה תיקייה שבה שומרים את קובץ הרפרנס שאותו רוצים להמיר.
+# את קובץ HG19 אין מה להמיר שוב ושוב כי הוא לא מתעדכן כבר שנים רבות.
+# את קובץ HG38 כדאי לעדכן מידי פעם כי הוא מתעדכן על בסיס יום יומי בווריאנטים חדשים
+
+
 import csv
 import gzip
 import os
@@ -82,5 +91,6 @@ snps19_file = "snps_hg19.csv"
 # קריאה לפונקצייה
 snps_to_Msnps(snps38_file)
 #snps_to_Msnps(snps19_file)
+
 
 
