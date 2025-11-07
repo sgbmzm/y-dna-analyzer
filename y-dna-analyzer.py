@@ -200,6 +200,10 @@ def update_required_files():
 
 # פונקצייה חשובה מאוד שטוענת את כל הקבצים הדרושים לפעילות התוכנה ומחזירה את המשתנים הדרושים 
 def get_required_files():
+    
+    # כל המשתנים הללו יהפכו לגלובליים לכל התוכנה ויוגדרו בפונקצייה זו
+    global is_required_files_exist, ab_groups_snp_path, snps_hg38_path, Msnps_hg19_path, yda_tree_path, yda_tree_version, yfull_tree_data
+    
     # משתנה גלובלי מאוד חשוב ששומר את המידע האם הקבצים הדרושים לתוכנה קיימים
     is_required_files_exist = False
         
@@ -251,7 +255,9 @@ def get_required_files():
 
     # הודעה למשתמש אם הקבצים הדרושים חסרים        
     if not is_required_files_exist:
-        messagebox.showerror("Required files are missing", f"Required files are missing\nThe software is useless without these files\nPlease connect to the internet and download them from the menu")
+        #messagebox.showerror("Required files are missing", f"Required files are missing\nThe software is useless without these files\nPlease connect to the internet and download them from the menu")
+        tk.Label(root, text="!!!!!!! Required files are missing !!!!!!!!\nThe software is useless without these files\nconnect to the internet and download them from the menu", fg="blue", bg="yellow").grid(row=4, column=2, padx=5, pady=5)
+
 
     # אם יש את כל הקבצים הדרושים בודקים מה תאריך הגרסה של עץ ווייפול שבו משתמשים וטוענים אותו לשימוש בתוכנה זו
     if is_required_files_exist:
@@ -268,9 +274,7 @@ def get_required_files():
         # טוען את עץ וייפול לשימוש בתוכנה כולל מידע על הגרסה (file_path: Path, version: str | None = None) -> YTreeData
         yfull_tree_data = tree.yfull_tree_to_tree_data(Path(yda_tree_path), version=string_version)
     else:
-        yfull_tree_data = None
-            
-    return is_required_files_exist, ab_groups_snp_path, snps_hg38_path, Msnps_hg19_path, yda_tree_path, yda_tree_version, yfull_tree_data
+        yfull_tree_data = None        
 
 ####################################################################################################
                 # משתנים גלובליים עבור התוכנה
@@ -412,6 +416,11 @@ def searc_lca():
         search_input_raw = entry_search.get()  # לדוגמה: "l243, zs222"
         # הופכים את הקלט לרשימה. לדוגמא: [L243, ZS222]
         lca_snps_input = [snp.strip().upper() for snp in search_input_raw.split(",") if snp.strip()]
+        
+        # בדיקה אם יש לפחות שני ערכים. רק אם יש אפשר להמשיך
+        if len(lca_snps_input) < 2:
+            messagebox.showwarning("Invalid input MRCA", "The search box should contain at least two variant names, separated by a comma.\nFor example: L243, ZS222")
+            return  # לא ממשיכים עם הפונקציה
 
         # מציאת האב האחרון המשותף לכל הווריאנטים שברשימה
         lca_node = lowest_common_ancestor_multiple(yfull_tree_data, lca_snps_input)
@@ -426,7 +435,7 @@ def searc_lca():
     except Exception as e:
         tb_str = traceback.format_exc() # תופס את כל הפרטים אודות השגיאה ולא רק את נוסח השגיאה עצמה שזה e
         print(tb_str)
-        messagebox.showerror("searc_lca Error", f"{e}\nThe search box should contain at least two variant names, separated by a comma.\nFor example: L243, ZS222")
+        messagebox.showerror("searc_lca Error", f"{e}")
   
         
 
@@ -1435,7 +1444,7 @@ mb["menu"] =  mb.menu
 mb.menu.add_command ( label= "Information", command= show_information)
 mb.menu.add_command ( label= "open yda dir", command= lambda: subprocess.run(["explorer" if is_windows else "xdg-open", str(yda_dir_path)]))
 mb.menu.add_command ( label= "Download/Update required files", command= update_required_files)
-mb.menu.add_command ( label= "searc_lca", command= searc_lca)
+mb.menu.add_command ( label= "Find multiple branches MRCA", command= searc_lca)
 
 
 
@@ -1448,13 +1457,12 @@ options_menu.add_command(label="open_yda_dir", command=lambda: subprocess.run(["
 options_menu.add_command(label="update_basic_files", command=update_required_files)
 menubar.add_cascade(label="Help & Options", menu=options_menu)
 '''
-##########################################################################
-# הבאת כל המשתנים של הקבצים הדרושים לתוכנה באמצעות פונקציית get_required_files() שהוגדרה למעלה
-is_required_files_exist, ab_groups_snp_path, snps_hg38_path, Msnps_hg19_path, yda_tree_path, yda_tree_version, yfull_tree_data = get_required_files()
 
-if not is_required_files_exist:
-    # תווית מידע
-    tk.Label(root, text="!!!!!!! Required files are missing !!!!!!!!\nThe software is useless without these files\nconnect to the internet and download them from the menu", fg="blue", bg="yellow").grid(row=4, column=2, padx=5, pady=5)
+##########################################################################
+    
+# הבאת כל המשתנים של הקבצים הדרושים לתוכנה באמצעות פונקציית get_required_files() שהוגדרה למעלה
+# בגלל שיש בה משהו שלוקח זמן ואני רוצה שהחלון יוצג לפני שהיא רצה אני שם אותה להפעלה ב after אחרי עליית החלון הראשי
+root.after(100, get_required_files)  # 1000 מילישניות = שנייה אחת
 
 # זה מריץ כל הזמן את החלון הראשי שיהיה קיים תמיד
 root.mainloop()
