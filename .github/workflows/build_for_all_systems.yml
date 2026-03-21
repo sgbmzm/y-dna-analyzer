@@ -1,0 +1,263 @@
+name: Build softwares for all systems
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            os_short_name: win
+            ext: .exe
+            sep: ";"
+            arch: x64
+          - os: windows-latest
+            os_short_name: win
+            ext: .exe
+            sep: ";"
+            arch: x86
+          - os: ubuntu-latest
+            os_short_name: linux
+            ext: ""
+            sep: ":"
+            arch: x64
+          - os: ubuntu-24.04-arm
+            os_short_name: linux
+            ext: ""
+            sep: ":"
+            arch: arm64
+          - os: macos-latest
+            os_short_name: mac
+            ext: ""
+            sep: ":"
+            arch: arm64
+          
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v5
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+        # xיתקין פייתון שמתאים לארכיטקטורה הספציפית. בלי השורה הבאה זה יהיה 64
+        architecture: ${{ matrix.arch }} 
+
+    - name: Install cu common dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install screeninfo skyfield pytz pyluach jdcal clipboard tzfpy gematriapy pynput platformdirs tzdata
+
+    - name: Install pillow and pyinstaller
+      run: |
+        pip install pyinstaller pillow
+    
+    - name: Install Windows-only dependencies
+      if: runner.os == 'Windows'
+      run: |
+        pip install pywin32
+
+    - name: Install Linux packaging tools
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y dpkg-dev fakeroot
+        pip install appimage-builder
+    
+    - name: Download de440.bsp
+      shell: bash
+      run: |
+        mkdir -p files
+        curl -L -o files/de440.bsp https://github.com/sgbmzm/cochavim-uzmanim/releases/download/cochavim_uzmanim_plus/de440.bsp
+
+    # ---- Build ONEDIR first ----
+    - name: Build onedir
+      shell: bash
+      run: |
+        
+        OS="${{ matrix.os }}"
+        VERSION="${{ matrix.os_short_name }}_${{ matrix.arch }}_onedir"
+
+        if [[ "$OS" == macos* ]]; then
+          pyinstaller --noconsole \
+            --add-data "files/cu_locations.csv${{ matrix.sep }}." \
+            --add-data "files/cu_stars.csv${{ matrix.sep }}." \
+            --add-data "files/de440.bsp${{ matrix.sep }}." \
+            --add-data "files/skyfield${{ matrix.sep }}skyfield" \
+            --add-data "files/cu_icon.png${{ matrix.sep }}." \
+            -i files/cu_icon.ico \
+            cochavim_uzmanim_plus.py
+        
+        elif [[ "$OS" == ubuntu* ]]; then
+          pyinstaller --noconsole --splash=files/cu_splash.png \
+            --hidden-import pynput.keyboard._xorg \
+            --hidden-import pynput.mouse._xorg \
+            --add-data "files/cu_locations.csv${{ matrix.sep }}." \
+            --add-data "files/cu_stars.csv${{ matrix.sep }}." \
+            --add-data "files/cu_splash.png${{ matrix.sep }}." \
+            --add-data "files/de440.bsp${{ matrix.sep }}." \
+            --add-data "files/skyfield${{ matrix.sep }}skyfield" \
+            --add-data "files/cu_icon.png${{ matrix.sep }}." \
+            -i files/cu_icon.ico \
+            cochavim_uzmanim_plus.py
+        
+        elif [[ "$OS" == windows* ]]; then
+          pyinstaller --noconsole --splash=files/cu_splash.png \
+            --add-data "files/cu_locations.csv${{ matrix.sep }}." \
+            --add-data "files/cu_stars.csv${{ matrix.sep }}." \
+            --add-data "files/cu_splash.png${{ matrix.sep }}." \
+            --add-data "files/de440.bsp${{ matrix.sep }}." \
+            --add-data "files/skyfield${{ matrix.sep }}skyfield" \
+            --add-data "files/cu_icon.png${{ matrix.sep }}." \
+            -i files/cu_icon.ico \
+            cochavim_uzmanim_plus.py
+        fi
+        
+        # יוצרים עותק של תיקיית הגרסה
+        cp -r dist/cochavim_uzmanim_plus cochavim_uzmanim_plus_${VERSION}
+        
+        # יוצרים תיקיית ריליס אם איננה קיימת
+        mkdir -p release
+        
+        # דוחסים את כל התיקייה כיחידה אחת (לא רק את התוכן שלה)
+        python -m zipfile -c release/cochavim_uzmanim_plus_${VERSION}.zip cochavim_uzmanim_plus_${VERSION}
+        
+        # מוחקים את תיקיית הגרסה
+        rm -rf cochavim_uzmanim_plus_${VERSION}
+
+        # הכנת הקובץ של cochavim_uzmanim_plus_dir עבור onefile
+        if [ "$OS" = "windows-latest" ]; then
+          cp dist/cochavim_uzmanim_plus/cochavim_uzmanim_plus.exe files/cochavim_uzmanim_plus_dir.exe
+        else
+          cp dist/cochavim_uzmanim_plus/cochavim_uzmanim_plus files/cochavim_uzmanim_plus_dir
+        fi
+
+       
+
+    # ---- Build Windows Installer (Inno Setup) ----
+    - name: Create setup.iss
+      if: matrix.os == 'windows-latest'
+      shell: bash
+      run: |
+        ARCH="${{ matrix.arch }}"   # הגדרת שם הארכיטקטורה
+        
+        echo '#define AppName "cochavim_uzmanim_plus"' > setup.iss
+        echo '' >> setup.iss
+        echo '[Setup]' >> setup.iss
+        echo 'AppName={#AppName}' >> setup.iss
+        echo 'AppVersion=1.0' >> setup.iss
+        echo 'DefaultDirName={commonpf}\{#AppName}' >> setup.iss
+        echo "OutputBaseFilename=cochavim_uzmanim_plus_win_${{ matrix.arch }}_installer" >> setup.iss
+        echo 'OutputDir=installer' >> setup.iss
+        echo 'Compression=lzma' >> setup.iss
+        echo 'SolidCompression=yes' >> setup.iss
+        echo 'CreateAppDir=yes' >> setup.iss
+        echo 'DisableProgramGroupPage=no' >> setup.iss
+        echo 'DefaultGroupName={#AppName}' >> setup.iss
+        echo 'SetupIconFile=files\cu_icon.ico' >> setup.iss
+        echo '' >> setup.iss
+        echo '[Languages]' >> setup.iss
+        echo 'Name: "hebrew"; MessagesFile: "compiler:Languages\Hebrew.isl"' >> setup.iss
+        echo 'Name: "english"; MessagesFile: "compiler:Default.isl"' >> setup.iss
+        echo '' >> setup.iss
+        echo '[Files]' >> setup.iss
+        echo 'Source: "dist\cochavim_uzmanim_plus\cochavim_uzmanim_plus.exe"; DestDir: "{app}"; Flags: ignoreversion' >> setup.iss
+        echo 'Source: "dist\cochavim_uzmanim_plus\_internal\*"; DestDir: "{app}\_internal"; Flags: recursesubdirs ignoreversion' >> setup.iss
+        echo '' >> setup.iss
+        echo '[Icons]' >> setup.iss
+        echo 'Name: "{commondesktop}\{#AppName}"; Filename: "{app}\cochavim_uzmanim_plus.exe"' >> setup.iss
+        echo 'Name: "{group}\{#AppName}"; Filename: "{app}\cochavim_uzmanim_plus.exe"' >> setup.iss
+        echo '' >> setup.iss
+        echo '[Run]' >> setup.iss
+        echo 'Filename: "{app}\cochavim_uzmanim_plus.exe"; Description: "Run {#AppName}"; Flags: nowait postinstall skipifsilent' >> setup.iss
+
+    - name: Install Inno Setup
+      if: matrix.os == 'windows-latest'
+      run: choco install innosetup -y
+
+    - name: Build Installer
+      if: matrix.os == 'windows-latest'
+      run: iscc setup.iss
+
+    - name: Add Installer to Release folder
+      if: matrix.os == 'windows-latest'
+      shell: bash
+      run: |
+        ARCH="${{ matrix.arch }}"   # הגדרת שם הארכיטקטורה
+        mkdir -p release
+        cp installer/*.exe release/ # מחפש קובץ שמסתיים ב EXE ומוסיף אותו
+
+    
+    # מוחקים את תיקיות הבנייה כדי שיהיו מוכנות ריקות לבנייה הבאה של תוכנה בקובץ אחד
+    - name: Clean build directories
+      shell: bash
+      run: rm -rf build dist
+
+    # ---- Build ONEFILE ----
+    - name: Build onefile
+      shell: bash
+      run: |
+        OS="${{ matrix.os }}"
+        VERSION="${{ matrix.os_short_name }}_${{ matrix.arch }}_onefile"
+
+        if [[ "$OS" == macos* ]]; then
+          pyinstaller --noconsole --onefile \
+            --add-data "files/cochavim_uzmanim_plus_dir${{ matrix.sep }}." \
+            --add-data "files/cu_locations.csv${{ matrix.sep }}." \
+            --add-data "files/cu_stars.csv${{ matrix.sep }}." \
+            --add-data "files/de440.bsp${{ matrix.sep }}." \
+            --add-data "files/skyfield${{ matrix.sep }}skyfield" \
+            --add-data "files/cu_icon.png${{ matrix.sep }}." \
+            -i files/cu_icon.ico \
+            cochavim_uzmanim_plus.py
+
+        elif [[ "$OS" == ubuntu* ]]; then
+          pyinstaller --noconsole --onefile --splash=files/cu_splash.png \
+            --hidden-import pynput.keyboard._xorg \
+            --hidden-import pynput.mouse._xorg \
+            --add-data "files/cochavim_uzmanim_plus_dir${{ matrix.ext }}${{ matrix.sep }}." \
+            --add-data "files/cu_locations.csv${{ matrix.sep }}." \
+            --add-data "files/cu_stars.csv${{ matrix.sep }}." \
+            --add-data "files/cu_splash.png${{ matrix.sep }}." \
+            --add-data "files/de440.bsp${{ matrix.sep }}." \
+            --add-data "files/skyfield${{ matrix.sep }}skyfield" \
+            --add-data "files/cu_icon.png${{ matrix.sep }}." \
+            -i files/cu_icon.ico \
+            cochavim_uzmanim_plus.py
+        
+        elif [[ "$OS" == windows* ]]; then
+          pyinstaller --noconsole --onefile --splash=files/cu_splash.png \
+            --add-data "files/cochavim_uzmanim_plus_dir${{ matrix.ext }}${{ matrix.sep }}." \
+            --add-data "files/cu_locations.csv${{ matrix.sep }}." \
+            --add-data "files/cu_stars.csv${{ matrix.sep }}." \
+            --add-data "files/cu_splash.png${{ matrix.sep }}." \
+            --add-data "files/de440.bsp${{ matrix.sep }}." \
+            --add-data "files/skyfield${{ matrix.sep }}skyfield" \
+            --add-data "files/cu_icon.png${{ matrix.sep }}." \
+            -i files/cu_icon.ico \
+            cochavim_uzmanim_plus.py
+        fi
+
+        mkdir -p release
+        cp dist/cochavim_uzmanim_plus${{ matrix.ext }} release/cochavim_uzmanim_plus_${VERSION}${{ matrix.ext }}
+
+    - name: Upload all builds to release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: auto-build
+        files: release/*
+        overwrite_files: true                      # מחליף קבצים קיימים עם אותו שם
+
+    - name: Upload builds to cu_public release
+      uses: softprops/action-gh-release@v2
+      with:
+        token: ${{ secrets.REMOTE_RELEASE_TOKEN }} # הרשאת גישה וכתיבה לרפו השני
+        repository: sgbmzm/cochavim-uzmanim       # הריפו השני
+        tag_name: cochavim_uzmanim_plus           # תג של הריליס הקיים
+        files: release/*                          # כל הקבצים שנוצרו
+        overwrite_files: true                      # מחליף קבצים קיימים עם אותו שם
