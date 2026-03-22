@@ -84,6 +84,8 @@ jobs:
         
         OS="${{ matrix.os }}"
         VERSION="${{ matrix.os_short_name }}_${{ matrix.arch }}_onedir"
+        MAIN_FILE="y-dna-analyzer.py"
+        APP_NAME="y-dna-analyzer"
 
         ##########################################################
         # הכנת הקבצים הנוספים שצריך להוסיף לתיקיית ההתקנה
@@ -96,28 +98,28 @@ jobs:
         "
 
         # עכשיו פקודת ייצוא קובץ ההתקנה
-        pyinstaller --noconsole $COMMON_DATA y-dna-analyzer.py
+        pyinstaller --noconsole --name $APP_NAME $COMMON_DATA $MAIN_FILE
 
         ##########################################################################
         
         # יוצרים עותק של תיקיית הגרסה
-        cp -r dist/cochavim_uzmanim_plus cochavim_uzmanim_plus_${VERSION}
+        cp -r dist/$APP_NAME ${APP_NAME}_${VERSION}
         
         # יוצרים תיקיית ריליס אם איננה קיימת
         mkdir -p release
         
         # דוחסים את כל התיקייה כיחידה אחת (לא רק את התוכן שלה)
-        python -m zipfile -c release/cochavim_uzmanim_plus_${VERSION}.zip cochavim_uzmanim_plus_${VERSION}
+        python -m zipfile -c release/${APP_NAME}_${VERSION}.zip ${APP_NAME}_${VERSION}
         
         # מוחקים את תיקיית הגרסה
-        rm -rf cochavim_uzmanim_plus_${VERSION}
+        rm -rf ${APP_NAME}_${VERSION}
 
         # הכנת הקובץ של cochavim_uzmanim_plus_dir עבור onefile
         # מתקין עושים רק לגרסת ווינדוס האחרונה
         if [ "$OS" = "windows-latest" ]; then
-          cp dist/cochavim_uzmanim_plus/cochavim_uzmanim_plus.exe files/cochavim_uzmanim_plus_dir.exe
+          cp dist/$APP_NAME/$APP_NAME.exe files/${APP_NAME}_dir.exe
         else
-          cp dist/cochavim_uzmanim_plus/cochavim_uzmanim_plus files/cochavim_uzmanim_plus_dir
+          cp dist/${APP_NAME}/${APP_NAME} files/${APP_NAME}_dir
         fi
 
        
@@ -127,15 +129,16 @@ jobs:
       if: matrix.os == 'windows-latest'
       shell: bash
       run: |
+        APP_NAME="y-dna-analyzer"
         ARCH="${{ matrix.arch }}"   # הגדרת שם הארכיטקטורה
         
-        echo '#define AppName "cochavim_uzmanim_plus"' > setup.iss
+        echo "#define AppName \"$APP_NAME\"" > setup.iss
         echo '' >> setup.iss
         echo '[Setup]' >> setup.iss
         echo 'AppName={#AppName}' >> setup.iss
         echo 'AppVersion=1.0' >> setup.iss
         echo 'DefaultDirName={commonpf}\{#AppName}' >> setup.iss
-        echo "OutputBaseFilename=cochavim_uzmanim_plus_win_${{ matrix.arch }}_installer" >> setup.iss
+        echo "OutputBaseFilename=${APP_NAME}_win_${ARCH}_installer" >> setup.iss
         echo 'OutputDir=installer' >> setup.iss
         echo 'Compression=lzma' >> setup.iss
         echo 'SolidCompression=yes' >> setup.iss
@@ -149,15 +152,15 @@ jobs:
         echo 'Name: "english"; MessagesFile: "compiler:Default.isl"' >> setup.iss
         echo '' >> setup.iss
         echo '[Files]' >> setup.iss
-        echo 'Source: "dist\cochavim_uzmanim_plus\cochavim_uzmanim_plus.exe"; DestDir: "{app}"; Flags: ignoreversion' >> setup.iss
-        echo 'Source: "dist\cochavim_uzmanim_plus\_internal\*"; DestDir: "{app}\_internal"; Flags: recursesubdirs ignoreversion' >> setup.iss
+        echo 'Source: "dist\'"$APP_NAME"'\'"$APP_NAME"'.exe"; DestDir: "{app}"; Flags: ignoreversion' >> setup.iss
+        echo 'Source: "dist\'"$APP_NAME"'\_internal\*"; DestDir: "{app}\_internal"; Flags: recursesubdirs ignoreversion' >> setup.iss
         echo '' >> setup.iss
         echo '[Icons]' >> setup.iss
-        echo 'Name: "{commondesktop}\{#AppName}"; Filename: "{app}\cochavim_uzmanim_plus.exe"' >> setup.iss
-        echo 'Name: "{group}\{#AppName}"; Filename: "{app}\cochavim_uzmanim_plus.exe"' >> setup.iss
+        echo 'Name: "{commondesktop}\{#AppName}"; Filename: "{app}\'"$APP_NAME"'.exe"' >> setup.iss
+        echo 'Name: "{group}\{#AppName}"; Filename: "{app}\'"$APP_NAME"'.exe"' >> setup.iss
         echo '' >> setup.iss
         echo '[Run]' >> setup.iss
-        echo 'Filename: "{app}\cochavim_uzmanim_plus.exe"; Description: "Run {#AppName}"; Flags: nowait postinstall skipifsilent' >> setup.iss
+        echo 'Filename: "{app}\'"$APP_NAME"'.exe"; Description: "Run {#AppName}"; Flags: nowait postinstall skipifsilent' >> setup.iss
 
     - name: Install Inno Setup
       if: matrix.os == 'windows-latest'
@@ -188,6 +191,8 @@ jobs:
       
         OS="${{ matrix.os }}"
         VERSION="${{ matrix.os_short_name }}_${{ matrix.arch }}_onefile"
+        MAIN_FILE="y-dna-analyzer.py"
+        APP_NAME="y-dna-analyzer"
 
         ##########################################################
         # הכנת הקבצים הנוספים שצריך להוסיף לתיקיית ההתקנה
@@ -200,12 +205,12 @@ jobs:
         "
 
         # עכשיו פקודת ייצוא קובץ ההתקנה
-        pyinstaller --noconsole --onefile $COMMON_DATA y-dna-analyzer.py
+        pyinstaller --noconsole --name $APP_NAME --onefile $COMMON_DATA $MAIN_FILE
 
         ##########################################################################
       
         mkdir -p release
-        cp dist/cochavim_uzmanim_plus${{ matrix.ext }} release/cochavim_uzmanim_plus_${VERSION}${{ matrix.ext }}
+        cp dist/${APP_NAME}${{ matrix.ext }} release/${APP_NAME}_${VERSION}${{ matrix.ext }}
 
     
     - name: Upload all builds to release
@@ -215,11 +220,4 @@ jobs:
         files: release/*
         overwrite_files: true                      # מחליף קבצים קיימים עם אותו שם
 
-    - name: Upload builds to cu_public release
-      uses: softprops/action-gh-release@v2
-      with:
-        token: ${{ secrets.REMOTE_RELEASE_TOKEN }} # הרשאת גישה וכתיבה לרפו השני
-        repository: sgbmzm/cochavim-uzmanim       # הריפו השני
-        tag_name: cochavim_uzmanim_plus           # תג של הריליס הקיים
-        files: release/*                          # כל הקבצים שנוצרו
-        overwrite_files: true                      # מחליף קבצים קיימים עם אותו שם
+    
