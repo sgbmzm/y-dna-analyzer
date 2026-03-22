@@ -71,11 +71,11 @@ jobs:
         sudo apt-get install -y dpkg-dev fakeroot
         pip install appimage-builder
     
-    - name: Download de440.bsp
+    - name: Download Msnps_hg38.vcf.gz
       shell: bash
       run: |
-        mkdir -p files
-        curl -L -o files/de440.bsp https://github.com/sgbmzm/cochavim-uzmanim/releases/download/cochavim_uzmanim_plus/de440.bsp
+        mkdir -p required_files
+        curl -L -o required_files/Msnps_hg38.vcf.gz https://github.com/sgbmzm/y-dna-analyzer/releases/download/y-dna-analyzer/Msnps_hg38.vcf.gz
 
     # ---- Build ONEDIR first ----
     - name: Build onedir
