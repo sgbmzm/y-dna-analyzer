@@ -19,9 +19,8 @@ jobs:
       shell: bash
       run: |
         mkdir -p required_files
-        curl -L -o required_files/current_tree.json https://raw.githubusercontent.com/YFullTeam/YTree/main/current_tree.json
-        curl -L -o required_files/current_version.txt https://raw.githubusercontent.com/YFullTeam/YTree/main/current_version.txt
-
+        curl -L -o required_files/current_tree.json https://raw.githubusercontent.com/YFullTeam/YTree/refs/heads/master/current_tree.json
+        curl -L -o required_files/current_version.txt https://raw.githubusercontent.com/YFullTeam/YTree/refs/heads/master/current_version.txt
     # ---- Check if update is needed ----
     - name: Check if update needed
       id: version_check
