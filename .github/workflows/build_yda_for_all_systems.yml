@@ -117,9 +117,9 @@ jobs:
         # הכנת הקובץ של cochavim_uzmanim_plus_dir עבור onefile
         # מתקין עושים רק לגרסת ווינדוס האחרונה
         if [ "$OS" = "windows-latest" ]; then
-          cp dist/$APP_NAME/$APP_NAME.exe files/${APP_NAME}_dir.exe
+          cp dist/$APP_NAME/$APP_NAME.exe required_files/${APP_NAME}_dir.exe
         else
-          cp dist/${APP_NAME}/${APP_NAME} files/${APP_NAME}_dir
+          cp dist/${APP_NAME}/${APP_NAME} required_files/${APP_NAME}_dir
         fi
 
        
