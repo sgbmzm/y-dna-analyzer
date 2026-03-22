@@ -943,7 +943,15 @@ def load_user_dna_file():
         last_positive_snp_string = ", ".join(positive_snps)
         #print("Final positive SNPs:", last_positive_snp_string)
 
-        dna_loading_label.config(fg="blue", text=f"DNA file loaded: \nname: {os.path.basename(file_path)} {f'\nvcf sample name: {sample_name}' if is_vcf_file else ""} \n{len(user_snps_dict)} total Y-rows  \n{len(positive_snps)} Positive Y-SNPs in DNA_file  \nref type: {ref_auto_detect}")
+        lines = [
+            f"DNA file loaded: \nname: {os.path.basename(file_path)}",
+            f"\nvcf sample name: {sample_name}" if is_vcf_file else "",
+            f"\n{len(user_snps_dict)} total Y-rows",
+            f"\n{len(positive_snps)} Positive Y-SNPs in DNA_file",
+            f"\nref type: {ref_auto_detect}"
+        ]
+
+        dna_loading_label.config(fg="blue", text="".join(lines))
         user_loaded = True
         
         # אם יש פחות ממאה ווריאנטים חיוביים זה אומר שיש בעיה ואין מה לחשב את ענף וייפול המתאים
