@@ -22,7 +22,7 @@ from yclade import tree, snps, find, const
 import networkx as nx
 
 # משתנה ששומר את תאריך הגרסה של התוכנה עבור הדפסה בשורת הכותרת של התוכנה
-yda_version_date = "07 Nov 2025"
+yda_version_date = "22/3/2026"
 
 # משתנה מאוד חשוב שקובע האם מערכת ההפעלה הנוכחית היא ווינדוס כי אם היא לא אז אי אפשר לעשות חלק מהפעולות
 is_windows = platform.system() == "Windows"
@@ -142,14 +142,11 @@ def update_required_files():
 
     # רשימת קבצים להורדה
     files_to_download = [
-        ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/pyinstaller.txt", "pyinstaller.txt"),
-        ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/y-dna-analyzer.py", "y-dna-analyzer.py"),
-        
         ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/required_files/ab_groups_snp.csv", "ab_groups_snp.csv"),
         ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/required_files/yda_yfull_tree_version.txt", "yda_yfull_tree_version.txt"),
         ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/required_files/yda_yfull_tree.json", "yda_yfull_tree.json"),
         ("https://raw.githubusercontent.com/sgbmzm/y-dna-analyzer/main/required_files/Msnps_hg19.vcf.gz", "Msnps_hg19.vcf.gz"),
-        ("https://github.com/sgbmzm/y-dna-analyzer/releases/download/y-dna-analyzer/Msnps_hg38.vcf.gz", "Msnps_hg38.vcf.gz"),
+        ("https://github.com/sgbmzm/y-dna-analyzer/releases/download/required_large_files/Msnps_hg38.vcf.gz", "Msnps_hg38.vcf.gz"),
         #("https://ybrowse.org/gbrowse2/gff/snps_hg38.vcf.gz", "snps_hg38.vcf.gz"),
     ]
     '''
