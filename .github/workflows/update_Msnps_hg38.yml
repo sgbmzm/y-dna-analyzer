@@ -35,5 +35,6 @@ jobs:
           files: Msnps_hg38.vcf.gz
           tag_name: required_large_files
           body: "Updated HG38 VCF based on latest data from ybrowse. Date: $(date +'%Y-%m-%d')"
+          overwrite: true # מבטיח דריסה של הקובץ הקיים באותו שם
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
