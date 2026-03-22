@@ -22,8 +22,8 @@ jobs:
 
       - name: Get current date
         id: date_step
-        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
-
+        run: echo "date=$(date +'%Y-%m-%d %H:%M')" >> $GITHUB_OUTPUT
+        
       - name: Download latest HG38 CSV
         run: |
           curl -L -o snps_hg38.csv https://ybrowse.org/gbrowse2/gff/snps_hg38.csv
@@ -37,6 +37,6 @@ jobs:
         with:
           files: Msnps_hg38.vcf.gz
           tag_name: required_large_files
-          body: "Updated HG38 VCF based on latest data from ybrowse. Date: ${{ steps.date_step.outputs.date }}"
+          body: "Updated Msnps_hg38 VCF based on latest data from ybrowse. Date: ${{ steps.date_step.outputs.date }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
