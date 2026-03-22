@@ -1,0 +1,59 @@
+name: Update YFull tree files
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-tree:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+
+    # ---- Download latest YTree version ----
+    - name: Download latest YTree version
+      shell: bash
+      run: |
+        mkdir -p required_files
+        curl -L -o required_files/current_tree.json https://github.com/YFullTeam/YTree/raw/main/current_tree.json
+        curl -L -o required_files/current_version.txt https://github.com/YFullTeam/YTree/raw/main/current_version.txt
+
+    # ---- Check if update is needed ----
+    - name: Check if update needed
+      id: version_check
+      shell: bash
+      run: |
+        OLD_VERSION=$(cat required_files/yda_yfull_tree_version.txt 2>/dev/null || echo "none")
+        NEW_VERSION=$(cat required_files/current_version.txt)
+        echo "old=$OLD_VERSION" >> $GITHUB_OUTPUT
+        echo "new=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+        if [ "$OLD_VERSION" != "$NEW_VERSION" ]; then
+          echo "update_needed=true" >> $GITHUB_OUTPUT
+        else
+          echo "update_needed=false" >> $GITHUB_OUTPUT
+        fi
+
+    # ---- Copy new files to project structure ----
+    - name: Update tree files
+      if: steps.version_check.outputs.update_needed == 'true'
+      shell: bash
+      run: |
+        cp required_files/current_tree.json required_files/yda_yfull_tree.json
+        cp required_files/current_version.txt required_files/yda_yfull_tree_version.txt
+
+    # ---- Commit changes with detailed message including old → new version ----
+    - name: Commit changes
+      if: steps.version_check.outputs.update_needed == 'true'
+      shell: bash
+      run: |
+        git config user.name "github-actions"
+        git config user.email "actions@github.com"
+
+        OLD=$(cat required_files/yda_yfull_tree_version.txt || echo "none")
+        NEW=$(cat required_files/current_version.txt)
+
+        git add required_files/yda_yfull_tree.json
+        git add required_files/yda_yfull_tree_version.txt
+
+        git commit -m "Update YFull tree files: $OLD → $NEW"
+        git push
