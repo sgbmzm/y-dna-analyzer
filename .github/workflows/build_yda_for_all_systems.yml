@@ -1,4 +1,4 @@
-name: Build softwares for all systems
+name: Build yda softwares for all systems
 
 on:
   workflow_dispatch:
@@ -47,11 +47,13 @@ jobs:
         python-version: "3.11"
         # xיתקין פייתון שמתאים לארכיטקטורה הספציפית. בלי השורה הבאה זה יהיה 64
         architecture: ${{ matrix.arch }} 
+        #cache: pip
+        #cache-dependency-path: .github/workflows/build_cu_for_all_systems.yml
 
-    - name: Install cu common dependencies
+    - name: Install yda common dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install screeninfo skyfield pytz pyluach jdcal clipboard tzfpy gematriapy pynput platformdirs tzdata
+        pip install platformdirs yclade networkx
 
     - name: Install pillow and pyinstaller
       run: |
@@ -83,40 +85,20 @@ jobs:
         OS="${{ matrix.os }}"
         VERSION="${{ matrix.os_short_name }}_${{ matrix.arch }}_onedir"
 
-        if [[ "$OS" == macos* ]]; then
-          pyinstaller --noconsole \
-            --add-data "files/cu_locations.csv${{ matrix.sep }}." \
-            --add-data "files/cu_stars.csv${{ matrix.sep }}." \
-            --add-data "files/de440.bsp${{ matrix.sep }}." \
-            --add-data "files/skyfield${{ matrix.sep }}skyfield" \
-            --add-data "files/cu_icon.png${{ matrix.sep }}." \
-            -i files/cu_icon.ico \
-            cochavim_uzmanim_plus.py
-        
-        elif [[ "$OS" == ubuntu* ]]; then
-          pyinstaller --noconsole --splash=files/cu_splash.png \
-            --hidden-import pynput.keyboard._xorg \
-            --hidden-import pynput.mouse._xorg \
-            --add-data "files/cu_locations.csv${{ matrix.sep }}." \
-            --add-data "files/cu_stars.csv${{ matrix.sep }}." \
-            --add-data "files/cu_splash.png${{ matrix.sep }}." \
-            --add-data "files/de440.bsp${{ matrix.sep }}." \
-            --add-data "files/skyfield${{ matrix.sep }}skyfield" \
-            --add-data "files/cu_icon.png${{ matrix.sep }}." \
-            -i files/cu_icon.ico \
-            cochavim_uzmanim_plus.py
-        
-        elif [[ "$OS" == windows* ]]; then
-          pyinstaller --noconsole --splash=files/cu_splash.png \
-            --add-data "files/cu_locations.csv${{ matrix.sep }}." \
-            --add-data "files/cu_stars.csv${{ matrix.sep }}." \
-            --add-data "files/cu_splash.png${{ matrix.sep }}." \
-            --add-data "files/de440.bsp${{ matrix.sep }}." \
-            --add-data "files/skyfield${{ matrix.sep }}skyfield" \
-            --add-data "files/cu_icon.png${{ matrix.sep }}." \
-            -i files/cu_icon.ico \
-            cochavim_uzmanim_plus.py
-        fi
+        ##########################################################
+        # הכנת הקבצים הנוספים שצריך להוסיף לתיקיית ההתקנה
+        COMMON_DATA="\
+        --add-data required_files/yda_yfull_tree.json${{ matrix.sep }}. \
+        --add-data required_files/yda_yfull_tree_version.txt${{ matrix.sep }}. \
+        --add-data required_files/ab_groups_snp.csv${{ matrix.sep }}. \
+        --add-data required_files/Msnps_hg19.vcf.gz${{ matrix.sep }}. \
+        --add-data required_files/Msnps_hg38.vcf.gz${{ matrix.sep }}. 
+        "
+
+        # עכשיו פקודת ייצוא קובץ ההתקנה
+        pyinstaller --noconsole $COMMON_DATA y-dna-analyzer.py
+
+        ##########################################################################
         
         # יוצרים עותק של תיקיית הגרסה
         cp -r dist/cochavim_uzmanim_plus cochavim_uzmanim_plus_${VERSION}
@@ -131,6 +113,7 @@ jobs:
         rm -rf cochavim_uzmanim_plus_${VERSION}
 
         # הכנת הקובץ של cochavim_uzmanim_plus_dir עבור onefile
+        # מתקין עושים רק לגרסת ווינדוס האחרונה
         if [ "$OS" = "windows-latest" ]; then
           cp dist/cochavim_uzmanim_plus/cochavim_uzmanim_plus.exe files/cochavim_uzmanim_plus_dir.exe
         else
@@ -202,50 +185,29 @@ jobs:
     - name: Build onefile
       shell: bash
       run: |
+      
         OS="${{ matrix.os }}"
         VERSION="${{ matrix.os_short_name }}_${{ matrix.arch }}_onefile"
 
-        if [[ "$OS" == macos* ]]; then
-          pyinstaller --noconsole --onefile \
-            --add-data "files/cochavim_uzmanim_plus_dir${{ matrix.sep }}." \
-            --add-data "files/cu_locations.csv${{ matrix.sep }}." \
-            --add-data "files/cu_stars.csv${{ matrix.sep }}." \
-            --add-data "files/de440.bsp${{ matrix.sep }}." \
-            --add-data "files/skyfield${{ matrix.sep }}skyfield" \
-            --add-data "files/cu_icon.png${{ matrix.sep }}." \
-            -i files/cu_icon.ico \
-            cochavim_uzmanim_plus.py
+        ##########################################################
+        # הכנת הקבצים הנוספים שצריך להוסיף לתיקיית ההתקנה
+        COMMON_DATA="\
+        --add-data required_files/yda_yfull_tree.json${{ matrix.sep }}. \
+        --add-data required_files/yda_yfull_tree_version.txt${{ matrix.sep }}. \
+        --add-data required_files/ab_groups_snp.csv${{ matrix.sep }}. \
+        --add-data required_files/Msnps_hg19.vcf.gz${{ matrix.sep }}. \
+        --add-data required_files/Msnps_hg38.vcf.gz${{ matrix.sep }}. 
+        "
 
-        elif [[ "$OS" == ubuntu* ]]; then
-          pyinstaller --noconsole --onefile --splash=files/cu_splash.png \
-            --hidden-import pynput.keyboard._xorg \
-            --hidden-import pynput.mouse._xorg \
-            --add-data "files/cochavim_uzmanim_plus_dir${{ matrix.ext }}${{ matrix.sep }}." \
-            --add-data "files/cu_locations.csv${{ matrix.sep }}." \
-            --add-data "files/cu_stars.csv${{ matrix.sep }}." \
-            --add-data "files/cu_splash.png${{ matrix.sep }}." \
-            --add-data "files/de440.bsp${{ matrix.sep }}." \
-            --add-data "files/skyfield${{ matrix.sep }}skyfield" \
-            --add-data "files/cu_icon.png${{ matrix.sep }}." \
-            -i files/cu_icon.ico \
-            cochavim_uzmanim_plus.py
-        
-        elif [[ "$OS" == windows* ]]; then
-          pyinstaller --noconsole --onefile --splash=files/cu_splash.png \
-            --add-data "files/cochavim_uzmanim_plus_dir${{ matrix.ext }}${{ matrix.sep }}." \
-            --add-data "files/cu_locations.csv${{ matrix.sep }}." \
-            --add-data "files/cu_stars.csv${{ matrix.sep }}." \
-            --add-data "files/cu_splash.png${{ matrix.sep }}." \
-            --add-data "files/de440.bsp${{ matrix.sep }}." \
-            --add-data "files/skyfield${{ matrix.sep }}skyfield" \
-            --add-data "files/cu_icon.png${{ matrix.sep }}." \
-            -i files/cu_icon.ico \
-            cochavim_uzmanim_plus.py
-        fi
+        # עכשיו פקודת ייצוא קובץ ההתקנה
+        pyinstaller --noconsole --onefile $COMMON_DATA y-dna-analyzer.py
 
+        ##########################################################################
+      
         mkdir -p release
         cp dist/cochavim_uzmanim_plus${{ matrix.ext }} release/cochavim_uzmanim_plus_${VERSION}${{ matrix.ext }}
 
+    
     - name: Upload all builds to release
       uses: softprops/action-gh-release@v2
       with:
