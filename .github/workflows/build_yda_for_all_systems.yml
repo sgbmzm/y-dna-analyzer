@@ -75,7 +75,7 @@ jobs:
       shell: bash
       run: |
         mkdir -p required_files
-        curl -L -o required_files/Msnps_hg38.vcf.gz https://github.com/sgbmzm/y-dna-analyzer/releases/download/y-dna-analyzer/Msnps_hg38.vcf.gz
+        curl -L -o required_files/Msnps_hg38.vcf.gz https://github.com/sgbmzm/y-dna-analyzer/releases/download/required_large_files/Msnps_hg38.vcf.gz
 
     # ---- Build ONEDIR first ----
     - name: Build onedir
