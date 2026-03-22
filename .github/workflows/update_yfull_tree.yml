@@ -5,6 +5,9 @@ on:
   schedule:
     - cron: '0 0 1 * *'  # ירוץ ב־UTC בתאריך 1 של כל חודש בשעה 00:00
 
+permissions:
+  contents: write
+
 jobs:
   update-tree:
     runs-on: ubuntu-latest
