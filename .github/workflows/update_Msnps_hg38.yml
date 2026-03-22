@@ -1,0 +1,39 @@
+name: Update Msnps_hg38 VCF Reference File
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' # רץ בכל יום ראשון בחצות. ניתן לשנות ל-'0 0 * * *' להרצה יומית
+  workflow_dispatch: # מאפשר הרצה ידנית בלחיצת כפתור
+
+jobs:
+  build-and-update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # נחוץ כדי לעדכן קבצים ב-Releases
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Download latest HG38 CSV
+        run: |
+          curl -L -o snps_hg38.csv https://ybrowse.org/gbrowse2/gff/snps_hg38.csv
+
+      - name: Run conversion script
+        run: |
+          # מניח שהסקריפט נמצא בנתיב שציינת
+          python additions/from_snpsCSV_to_Msnps_VCF.py
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: Msnps_hg38.vcf.gz
+          tag_name: required_large_files
+          body: "Updated HG38 VCF based on latest data from ybrowse. Date: $(date +'%Y-%m-%d')"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
