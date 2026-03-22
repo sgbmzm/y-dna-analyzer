@@ -114,7 +114,7 @@ jobs:
         # מוחקים את תיקיית הגרסה
         rm -rf ${APP_NAME}_${VERSION}
 
-        # הכנת הקובץ של cochavim_uzmanim_plus_dir עבור onefile
+        # הכנת הקובץ של y-dna-analyzer_dir עבור onefile
         # מתקין עושים רק לגרסת ווינדוס האחרונה
         if [ "$OS" = "windows-latest" ]; then
           cp dist/$APP_NAME/$APP_NAME.exe required_files/${APP_NAME}_dir.exe
@@ -145,7 +145,7 @@ jobs:
         echo 'CreateAppDir=yes' >> setup.iss
         echo 'DisableProgramGroupPage=no' >> setup.iss
         echo 'DefaultGroupName={#AppName}' >> setup.iss
-        echo 'SetupIconFile=files\cu_icon.ico' >> setup.iss
+        echo '; SetupIconFile=required_files\yda_icon.ico' >> setup.iss
         echo '' >> setup.iss
         echo '[Languages]' >> setup.iss
         echo 'Name: "hebrew"; MessagesFile: "compiler:Languages\Hebrew.isl"' >> setup.iss
