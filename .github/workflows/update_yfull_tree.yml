@@ -2,6 +2,8 @@ name: Update YFull tree files
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 0 1 * *'  # ירוץ ב־UTC בתאריך 1 של כל חודש בשעה 00:00
 
 jobs:
   update-tree:
@@ -14,8 +16,8 @@ jobs:
       shell: bash
       run: |
         mkdir -p required_files
-        curl -L -o required_files/current_tree.json https://github.com/YFullTeam/YTree/raw/main/current_tree.json
-        curl -L -o required_files/current_version.txt https://github.com/YFullTeam/YTree/raw/main/current_version.txt
+        curl -L -o required_files/current_tree.json https://raw.githubusercontent.com/YFullTeam/YTree/main/current_tree.json
+        curl -L -o required_files/current_version.txt https://raw.githubusercontent.com/YFullTeam/YTree/main/current_version.txt
 
     # ---- Check if update is needed ----
     - name: Check if update needed
@@ -23,7 +25,8 @@ jobs:
       shell: bash
       run: |
         OLD_VERSION=$(cat required_files/yda_yfull_tree_version.txt 2>/dev/null || echo "none")
-        NEW_VERSION=$(cat required_files/current_version.txt)
+        NEW_VERSION=$(cat required_files/current_version.txt | tr -d '\r\n')
+
         echo "old=$OLD_VERSION" >> $GITHUB_OUTPUT
         echo "new=$NEW_VERSION" >> $GITHUB_OUTPUT
 
@@ -50,7 +53,7 @@ jobs:
         git config user.email "actions@github.com"
 
         OLD=$(cat required_files/yda_yfull_tree_version.txt || echo "none")
-        NEW=$(cat required_files/current_version.txt)
+        NEW=$(cat required_files/current_version.txt | tr -d '\r\n')
 
         git add required_files/yda_yfull_tree.json
         git add required_files/yda_yfull_tree_version.txt
