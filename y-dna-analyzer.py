@@ -1356,7 +1356,7 @@ root = tk.Tk()
 #root.minsize(500, 500)
 
 # כותרת לחלון
-root.title(f"Y-DNA-Analyzer | by Dr. simcha-gershon Bohrer (PhD.) | versin date: {yda_version_date}")
+root.title(f"Y-DNA-Analyzer | by Dr. simcha-gershon Bohrer (PhD.) | version date: {yda_version_date}")
 
 # מפרידים אנכיים בין העמודות
 ttk.Separator(root, orient="vertical").grid(row=0, column=1, sticky="ns", padx=5, rowspan=20)
