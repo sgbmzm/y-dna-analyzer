@@ -22,7 +22,7 @@ from yclade import tree, snps, find, const
 import networkx as nx
 
 # משתנה ששומר את תאריך הגרסה של התוכנה עבור הדפסה בשורת הכותרת של התוכנה
-yda_version_date = "22/3/2026"
+yda_version_date = "26/3/2026"
 
 # משתנה מאוד חשוב שקובע האם מערכת ההפעלה הנוכחית היא ווינדוס כי אם היא לא אז אי אפשר לעשות חלק מהפעולות
 is_windows = platform.system() == "Windows"
