@@ -315,7 +315,7 @@ def reset_user():
     dna_loading_label.config(text="No DNA_file loaded", fg="red")
     yclade_label.config(text="Check SNP or load DNA-file", fg="red")
     user_result_var.set("")
-    user_result_label.config(text="", bg="SystemButtonFace")
+    user_result_label.config(text="", bg=user_result_label.master.cget("bg"))
     btn_save_results.grid_forget()
     btn_unload_dna.grid_forget()
     last_dna_file_info = ""
@@ -1518,11 +1518,3 @@ root.mainloop()
 # כרומוזום Y נקרא בקובץ:   Y
 
 # מייהירטייג: כתוב שם החברה, כתוב רפרנס 
-
-
-
-
-
-
-
-
