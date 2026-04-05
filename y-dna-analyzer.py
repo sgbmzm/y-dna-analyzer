@@ -1,3 +1,4 @@
+
 # יבוא הספריות הדרושות לתוכנה
 import tkinter as tk
 from tkinter import *
@@ -335,7 +336,7 @@ def unload_ref():
     reference_loading_label.config(text="No reference_file loaded", fg="red")
     btn_unload_ref.grid_forget()
     ref_result_var.set("")
-    ref_result_label.config(text="", bg="SystemButtonFace")
+    ref_result_label.config(text="", bg=ref_result_label.master.cget("bg"))
     reset_user() # מוסיפים ביטול של טעינת קובץ המשתמש כי בלי רפרנס אי אפשר להציג נתוני משתמש
 
 # פונקצייה שבודקת אילו ווריאנטים נמצאים בעץ yfull ואיזה לא קיימים שם
@@ -1138,7 +1139,7 @@ def run_calculate_clade(Final_clade_index = 0):
         
         more_result_warning = "\n\nwarning!: There is more result with the same 'score'\nOne of them may be wrong \nsave results and check it"
             
-        #ref_result_label.config(fg="green", bg="SystemButtonFace")
+        #ref_result_label.config(fg="green", bg=ref_result_label.master.cget("bg"))
         
         def split_ab_string(ab_string: str, per_line: int = 5) -> str:
             """
@@ -1311,7 +1312,7 @@ def check_search_input(ref_search = True):
         # אם יש כמה ווריאנטים לאותו מיקום גנומי זה יציג כל אחד בשורה נפרדת
         fields_reference_for_result_var = "\n".join(str(item) for item in fields_reference)
         ref_result_var.set(fields_reference_for_result_var)
-        ref_result_label.config(fg="green", bg="SystemButtonFace")
+        ref_result_label.config(fg="green", bg=ref_result_label.master.cget("bg"))
     else:
         ref_result_var.set(f"{search_input} not found in reference file")
         ref_result_label.config(fg="blue", bg="yellow")
@@ -1320,7 +1321,7 @@ def check_search_input(ref_search = True):
     if fields_user:
         user_result_var.set(fields_user)
         fg_for_user_result_label = "green" if fields_user["is_positive"] == "Yes" else "red"
-        user_result_label.config(fg=fg_for_user_result_label, bg="SystemButtonFace")       
+        user_result_label.config(fg=fg_for_user_result_label, bg=user_result_label.master.cget("bg"))       
     else:
         msg = f"{search_input} not found in user DNA_file" if user_loaded else "user DNA_file_not_loaded"
         user_result_var.set(msg)
@@ -1518,3 +1519,4 @@ root.mainloop()
 # כרומוזום Y נקרא בקובץ:   Y
 
 # מייהירטייג: כתוב שם החברה, כתוב רפרנס 
+
