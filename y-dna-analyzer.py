@@ -1225,7 +1225,7 @@ def save_clades_to_file():
         messagebox.showerror("save_clades_to_file Error", "No Clades to save.")
         return
     file_path = filedialog.asksaveasfilename(
-        initialfile=f"{os.path.basename(last_dna_file)}.yclade_results.txt",
+        initialfile=f"{os.path.basename(last_dna_file) if last_dna_file else getattr(last_clades[0], 'name', '')}.yclade_results.txt",
         defaultextension=".txt",
         filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
     )
@@ -1519,4 +1519,3 @@ root.mainloop()
 # כרומוזום Y נקרא בקובץ:   Y
 
 # מייהירטייג: כתוב שם החברה, כתוב רפרנס 
-
