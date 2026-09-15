@@ -23,7 +23,7 @@ from yclade import tree, snps, find, const
 import networkx as nx
 
 # משתנה ששומר את תאריך הגרסה של התוכנה עבור הדפסה בשורת הכותרת של התוכנה
-yda_version_date = "5/4/2026"
+yda_version_date = "15/9/2026"
 
 # משתנה מאוד חשוב שקובע האם מערכת ההפעלה הנוכחית היא ווינדוס כי אם היא לא אז אי אפשר לעשות חלק מהפעולות
 is_windows = platform.system() == "Windows"
@@ -638,8 +638,8 @@ def load_reference(ref_path):
                 ###################print(line)
                 
                 # מדלג על כל השורות שלא שייכות לכרומוזום Y
-                # בכל קבצי הרפרנס השורות מתחילות השורות הרלוונטיות מתחילות ב "chrY"
-                if not line.startswith("chrY"):
+                # בכל קבצי הרפרנס השורות מתחילות השורות הרלוונטיות מתחילות ב "chrY" או "ChrY"
+                if not line.startswith(("chrY", "ChrY")): 
                     continue
                 
                 # כאן אסור לעשות סטריפ כי זה מאט מאוד את הטעינה. נעשה אחר כך סטריפ רק על המידע שצריך.
