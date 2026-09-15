@@ -21,6 +21,7 @@ import json
 #import yclade
 from yclade import tree, snps, find, const
 import networkx as nx
+import sys
 
 # משתנה ששומר את תאריך הגרסה של התוכנה עבור הדפסה בשורת הכותרת של התוכנה
 yda_version_date = "15/9/2026"
