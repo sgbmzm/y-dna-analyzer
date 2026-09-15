@@ -65,7 +65,7 @@ def snps_to_Msnps(csv_path):
             reader = csv.reader(csvfile)
             next(reader, None)  # דילוג על שורת כותרת
             for row in reader:
-                chrom = row[col_indices['CHROM']].replace("hg19ChrY", "ChrY")
+                chrom = row[col_indices['CHROM']].replace("hg19ChrY", "chrY")
                 pos = row[col_indices['POS']]
                 snp_id = row[col_indices['ID']]
                 ref = row[col_indices['REF']]
